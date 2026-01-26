@@ -18,7 +18,8 @@ pub trait FileContentsGenerator {
         file_num: usize,
         retryable: bool,
         state: &mut Self::State,
-    ) -> io::Result<u64>;
+        hash_seed: Option<u64>,
+    ) -> io::Result<(u64, Option<u64>)>;
 
     fn byte_counts_pool_return(self) -> Option<Vec<u64>>;
 }
@@ -38,10 +39,11 @@ impl FileContentsGenerator for NoGeneratedFileContents {
         _: usize,
         _: bool,
         (): &mut Self::State,
-    ) -> io::Result<u64> {
+        _: Option<u64>,
+    ) -> io::Result<(u64, Option<u64>)> {
         cfg_if! {
             if #[cfg(any(not(unix), miri))] {
-                File::create(file).map(|_| 0)
+                File::create(file).map(|_| (0, None))
             } else if #[cfg(target_os = "linux")] {
                 use rustix::fs::{mknodat, FileType, Mode};
 
@@ -54,7 +56,7 @@ impl FileContentsGenerator for NoGeneratedFileContents {
                     0,
                 )
                 .map_err(io::Error::from)
-                .map(|()| 0)
+                .map(|()| (0, None))
             } else {
                 use rustix::fs::{openat, OFlags, Mode};
 
@@ -66,7 +68,7 @@ impl FileContentsGenerator for NoGeneratedFileContents {
                     Mode::RUSR | Mode::WUSR | Mode::RGRP | Mode::WGRP | Mode::ROTH,
                 )
                 .map_err(io::Error::from)
-                .map(|_| 0)
+                .map(|_| (0, None))
             }
         }
     }
@@ -101,7 +103,8 @@ impl FileContentsGenerator for OnTheFlyGeneratedFileContents {
         file_num: usize,
         retryable: bool,
         random: &mut Self::State,
-    ) -> io::Result<u64> {
+        hash_seed: Option<u64>,
+    ) -> io::Result<(u64, Option<u64>)> {
         let Self {
             ref num_bytes_distr,
             seed: _,
@@ -133,11 +136,11 @@ impl FileContentsGenerator for OnTheFlyGeneratedFileContents {
                 } else {
                     num_bytes
                 };
-                write_bytes(f, num_bytes, (fill_byte, random))?;
-                Ok(num_bytes)
+                let hash = write_bytes(f, num_bytes, (fill_byte, random), hash_seed)?;
+                Ok((num_bytes, hash))
             })
         } else {
-            NoGeneratedFileContents.create_file(file, file_num, retryable, &mut ())
+            NoGeneratedFileContents.create_file(file, file_num, retryable, &mut (), hash_seed)
         }
     }
 
@@ -170,7 +173,8 @@ impl FileContentsGenerator for PreDefinedGeneratedFileContents {
         file_num: usize,
         retryable: bool,
         random: &mut Self::State,
-    ) -> io::Result<u64> {
+        hash_seed: Option<u64>,
+    ) -> io::Result<(u64, Option<u64>)> {
         let Self {
             ref byte_counts,
             seed: _,
@@ -180,10 +184,10 @@ impl FileContentsGenerator for PreDefinedGeneratedFileContents {
         let num_bytes = byte_counts[file_num];
         if num_bytes > 0 {
             File::create(file)
-                .and_then(|f| write_bytes(f, num_bytes, (fill_byte, random)))
-                .map(|()| num_bytes)
+                .and_then(|f| write_bytes(f, num_bytes, (fill_byte, random), hash_seed))
+                .map(|hash| (num_bytes, hash))
         } else {
-            NoGeneratedFileContents.create_file(file, file_num, retryable, &mut ())
+            NoGeneratedFileContents.create_file(file, file_num, retryable, &mut (), hash_seed)
         }
     }
 
@@ -208,14 +212,28 @@ impl<'a, R> From<(Option<u8>, &'a mut R)> for BytesKind<'a, R> {
     tracing::instrument(level = "trace", skip(file, kind))
 )]
 fn write_bytes<'a, R: RngCore + 'static>(
-    mut file: File,
+    file: File,
     num: u64,
     kind: impl Into<BytesKind<'a, R>>,
-) -> io::Result<()> {
-    let copied = match kind.into() {
-        BytesKind::Random(random) => io::copy(&mut random.read_adapter().take(num), &mut file),
-        BytesKind::Fixed(byte) => io::copy(&mut io::repeat(byte).take(num), &mut file),
-    }?;
-    debug_assert_eq!(num, copied);
-    Ok(())
+    hash_seed: Option<u64>,
+) -> io::Result<Option<u64>> {
+    use crate::core::audit::HashingWriter;
+
+    if let Some(seed) = hash_seed {
+        let mut writer = HashingWriter::new(file, seed);
+        let copied = match kind.into() {
+            BytesKind::Random(random) => io::copy(&mut random.read_adapter().take(num), &mut writer),
+            BytesKind::Fixed(byte) => io::copy(&mut io::repeat(byte).take(num), &mut writer),
+        }?;
+        debug_assert_eq!(num, copied);
+        Ok(Some(writer.finalize()))
+    } else {
+        let mut file = file;
+        let copied = match kind.into() {
+            BytesKind::Random(random) => io::copy(&mut random.read_adapter().take(num), &mut file),
+            BytesKind::Fixed(byte) => io::copy(&mut io::repeat(byte).take(num), &mut file),
+        }?;
+        debug_assert_eq!(num, copied);
+        Ok(None)
+    }
 }

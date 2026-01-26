@@ -24,8 +24,11 @@ use rand_xoshiro::Xoshiro256PlusPlus;
 use thiserror::Error;
 use thousands::Separable;
 
+use std::sync::Arc;
+
 use crate::core::{
-    DynamicGenerator, GeneratorBytes, GeneratorStats, StaticGenerator, run, truncatable_normal,
+    DynamicGenerator, GeneratorBytes, GeneratorStats, StaticGenerator, audit::AuditTrail, run,
+    truncatable_normal,
 };
 
 #[derive(Error, Debug)]
@@ -105,6 +108,7 @@ pub struct Generator {
     max_depth: u32,
     #[builder(default = 0)]
     seed: u64,
+    pub audit_output: Option<PathBuf>,
 }
 
 #[cfg(test)]
@@ -159,6 +163,7 @@ struct Configuration {
     bytes_per_file: f64,
     max_depth: u32,
     seed: u64,
+    audit_output: Option<PathBuf>,
     human_info: HumanInfo,
 }
 
@@ -180,6 +185,7 @@ fn validated_options(
         bytes_exact,
         max_depth,
         seed,
+        audit_output,
     }: Generator,
 ) -> Result<Configuration, Error> {
     create_dir_all(&root_dir)
@@ -214,6 +220,7 @@ fn validated_options(
             bytes_per_file,
             max_depth: 0,
             seed,
+            audit_output,
             human_info: HumanInfo {
                 dirs_per_dir: 0,
                 total_dirs: 1,
@@ -242,6 +249,7 @@ fn validated_options(
             (num_files_with_ratio, max_depth, seed).hash(&mut hasher);
             hasher.finish()
         },
+        audit_output,
         human_info: HumanInfo {
             dirs_per_dir: dirs_per_dir.round() as usize,
             total_dirs: num_dirs.round() as usize,
@@ -266,6 +274,7 @@ fn print_configuration_info(
         bytes_per_file: _,
         max_depth,
         seed: _,
+        audit_output: _,
         human_info:
             HumanInfo {
                 dirs_per_dir,
@@ -372,7 +381,24 @@ fn run_generator(config: Configuration) -> Result<GeneratorStats, Error> {
         .attach(ExitCode::from(sysexits::ExitCode::OsErr))?;
 
     log!(Level::Info, "Starting config: {config:?}");
-    runtime.block_on(run_generator_async(config, parallelism))
+    let audit_output = config.audit_output.clone();
+    let audit_trail = audit_output
+        .as_ref()
+        .map(|_| Arc::new(AuditTrail::new()));
+
+    let res = runtime.block_on(run_generator_async(config, parallelism, audit_trail.clone()));
+
+    if let (Ok(_), Some(output), Some(trail)) = (&res, &audit_output, &audit_trail) {
+        log!(Level::Info, "Post-processing audit trail...");
+        trail.calculate_directory_sizes();
+        log!(Level::Info, "Writing audit trail to {output:?}...");
+        trail.write_csv(output)
+            .attach_printable_lazy(|| format!("Failed to write audit trail to {output:?}"))
+            .change_context(Error::Io)
+            .attach(ExitCode::from(sysexits::ExitCode::IoErr))?;
+    }
+
+    res
 }
 
 #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
@@ -388,9 +414,11 @@ async fn run_generator_async(
         bytes_per_file,
         max_depth,
         seed,
+        audit_output: _,
         human_info: _,
     }: Configuration,
     parallelism: NonZeroUsize,
+    audit_trail: Option<Arc<AuditTrail>>,
 ) -> Result<GeneratorStats, Error> {
     macro_rules! run {
         ($generator:expr) => {{
@@ -415,6 +443,7 @@ async fn run_generator_async(
             num_bytes_distr: truncatable_normal(bytes_per_file),
             fill_byte,
         }),
+        audit_trail,
     };
 
     if files_exact || (bytes_exact && bytes.is_some()) {

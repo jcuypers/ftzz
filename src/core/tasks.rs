@@ -1,6 +1,6 @@
 #![allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 
-use std::{cmp::min, io, num::NonZeroU64};
+use std::{cmp::min, io, num::NonZeroU64, sync::Arc};
 
 use rand::RngCore;
 use rand_distr::Normal;
@@ -8,6 +8,7 @@ use tokio::{task, task::JoinHandle};
 
 use crate::{
     core::{
+        audit::AuditTrail,
         file_contents::{
             FileContentsGenerator, NoGeneratedFileContents, OnTheFlyGeneratedFileContents,
             PreDefinedGeneratedFileContents,
@@ -120,6 +121,7 @@ pub struct DynamicGenerator<R> {
     pub random: R,
 
     pub bytes: Option<GeneratorBytes>,
+    pub audit_trail: Option<Arc<AuditTrail>>,
 }
 
 impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> {
@@ -135,19 +137,21 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
             ref num_dirs_distr,
             ref mut random,
             ref bytes,
+            ref audit_trail,
         } = *self;
 
         let num_files = sample_truncated(num_files_distr, random);
         let num_dirs = dirs_to_gen(num_files, gen_dirs, num_dirs_distr, random);
 
         macro_rules! build_params {
-            ($file_contents:expr) => {{
+            ($file_contents:expr, $audit_trail:expr) => {{
                 GeneratorTaskParams {
                     target_dir: file,
                     num_files,
                     num_dirs,
                     file_offset: 0,
                     file_contents: $file_contents,
+                    audit_trail: $audit_trail.clone(),
                 }
             }};
         }
@@ -158,15 +162,18 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
         }) = *bytes
         {
             queue(
-                build_params!(OnTheFlyGeneratedFileContents {
-                    num_bytes_distr,
-                    seed: random.next_u64(),
-                    fill_byte,
-                }),
+                build_params!(
+                    OnTheFlyGeneratedFileContents {
+                        num_bytes_distr,
+                        seed: random.next_u64(),
+                        fill_byte,
+                    },
+                    audit_trail
+                ),
                 false,
             )
         } else {
-            queue(build_params!(NoGeneratedFileContents), false)
+            queue(build_params!(NoGeneratedFileContents, audit_trail), false)
         }
     }
 }
@@ -199,6 +206,7 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for StaticGenerator<R> {
                     ref num_dirs_distr,
                     ref mut random,
                     bytes: _,
+                    audit_trail: _,
                 },
             ref mut files_exact,
             bytes_exact: _,
@@ -316,13 +324,14 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
         byte_counts_pool: &mut Vec<Vec<u64>>,
     ) -> QueueResult {
         macro_rules! build_params {
-            ($file_contents:expr) => {{
+            ($file_contents:expr, $audit_trail:expr) => {{
                 GeneratorTaskParams {
                     target_dir: file,
                     num_files,
                     num_dirs,
                     file_offset: offset,
                     file_contents: $file_contents,
+                    audit_trail: $audit_trail.clone(),
                 }
             }};
         }
@@ -333,6 +342,7 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                     num_dirs_distr: _,
                     ref mut random,
                     ref bytes,
+                    ref audit_trail,
                 },
             files_exact: _,
             ref mut bytes_exact,
@@ -382,28 +392,34 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                     }
 
                     queue(
-                        build_params!(PreDefinedGeneratedFileContents {
-                            byte_counts,
-                            seed: random.next_u64(),
-                            fill_byte,
-                        }),
+                        build_params!(
+                            PreDefinedGeneratedFileContents {
+                                byte_counts,
+                                seed: random.next_u64(),
+                                fill_byte,
+                            },
+                            audit_trail
+                        ),
                         done,
                     )
                 } else {
-                    queue(build_params!(NoGeneratedFileContents), done)
+                    queue(build_params!(NoGeneratedFileContents, audit_trail), done)
                 }
             } else {
                 queue(
-                    build_params!(OnTheFlyGeneratedFileContents {
-                        num_bytes_distr,
-                        seed: random.next_u64(),
-                        fill_byte,
-                    }),
+                    build_params!(
+                        OnTheFlyGeneratedFileContents {
+                            num_bytes_distr,
+                            seed: random.next_u64(),
+                            fill_byte,
+                        },
+                        audit_trail
+                    ),
                     done,
                 )
             }
         } else {
-            queue(build_params!(NoGeneratedFileContents), done)
+            queue(build_params!(NoGeneratedFileContents, audit_trail), done)
         }
     }
 }

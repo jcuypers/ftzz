@@ -3,6 +3,7 @@ use rand_distr::{Distribution, Normal};
 pub use scheduler::{GeneratorStats, run};
 pub use tasks::{DynamicGenerator, GeneratorBytes, StaticGenerator};
 
+pub mod audit;
 mod file_contents;
 mod files;
 mod scheduler;
