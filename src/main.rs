@@ -7,12 +7,16 @@ use std::{
     process::{ExitCode, Termination},
 };
 
-use clap::{ArgAction, Args, Parser, ValueHint, builder::ArgPredicate};
+use clap::{ArgAction, Args, Parser, ValueHint};
 use clap_num::si_number;
 use clap_verbosity_flag::Verbosity;
 use error_stack::ResultExt;
 use ftzz::{Generator, NumFilesWithRatio, NumFilesWithRatioError};
 use io_adapters::WriteExtension;
+
+mod config;
+
+use crate::config::Config;
 
 #[cfg(not(feature = "trace"))]
 type DefaultLevel = clap_verbosity_flag::WarnLevel;
@@ -47,6 +51,10 @@ struct Ftzz {
     #[command(next_display_order = None)]
     verbose: Verbosity<DefaultLevel>,
 
+    /// Path to a TOML configuration file
+    #[arg(long = "config", value_hint = ValueHint::FilePath, global = true)]
+    config_file: Option<PathBuf>,
+
     #[arg(short, long, short_alias = '?', global = true)]
     #[arg(action = ArgAction::Help, help = "Print help (use `--help` for more detail)")]
     #[arg(long_help = "Print help (use `-h` for a summary)")]
@@ -68,11 +76,10 @@ struct Generate {
     /// files may be generated so long as we attempt to get close to N.
     #[arg(short = 'n', long = "files", alias = "num-files")]
     #[arg(value_parser = num_files_parser)]
-    num_files: NonZeroU64,
+    num_files: Option<NonZeroU64>,
 
     /// Whether or not to generate exactly N files
-    #[arg(long = "files-exact")]
-    #[arg(default_value_if("exact", ArgPredicate::IsPresent, "true"))]
+    #[arg(long = "files-exact", action = ArgAction::SetTrue)]
     files_exact: bool,
 
     /// The total amount of random data to be distributed across the generated
@@ -83,8 +90,8 @@ struct Generate {
     #[arg(short = 'b', long = "total-bytes", aliases = & ["num-bytes", "num-total-bytes"])]
     #[arg(group = "num-bytes")]
     #[arg(value_parser = si_number::<u64>)]
-    #[arg(default_value = "0")]
-    num_bytes: u64,
+    #[arg(help = "The total amount of random data [default: 0]")]
+    num_bytes: Option<u64>,
 
     /// Specify a specific fill byte to be used instead of deterministically
     /// random data
@@ -95,21 +102,20 @@ struct Generate {
     fill_byte: Option<u8>,
 
     /// Whether or not to generate exactly N bytes
-    #[arg(long = "bytes-exact")]
-    #[arg(default_value_if("exact", ArgPredicate::IsPresent, "true"))]
+    #[arg(long = "bytes-exact", action = ArgAction::SetTrue)]
     #[arg(requires = "num-bytes")]
     bytes_exact: bool,
 
     /// Whether or not to generate exactly N files and bytes
-    #[arg(short = 'e', long = "exact")]
+    #[arg(short = 'e', long = "exact", action = ArgAction::SetTrue)]
     #[arg(conflicts_with_all = & ["files_exact", "bytes_exact"])]
     exact: bool,
 
     /// The maximum directory tree depth
     #[arg(short = 'd', long = "max-depth", alias = "depth")]
     #[arg(value_parser = si_number::<u32>)]
-    #[arg(default_value = "5")]
-    max_depth: u32,
+    #[arg(help = "The maximum directory tree depth [default: 5]")]
+    max_depth: Option<u32>,
 
     /// The number of files to generate per directory (default: files / 1000)
     ///
@@ -123,13 +129,44 @@ struct Generate {
     ///
     /// For example, you can use bash's `$RANDOM` function.
     #[arg(long = "seed", alias = "entropy")]
-    #[arg(default_value = "0")]
-    seed: u64,
+    #[arg(help = "Change the PRNG's starting seed [default: 0]")]
+    seed: Option<u64>,
+}
+
+impl Generate {
+    fn merge(&mut self, config: &Config) {
+        if self.num_files.is_none() {
+            self.num_files = config.files;
+        }
+        if !self.files_exact {
+            self.files_exact = config.files_exact.unwrap_or(false);
+        }
+        if self.num_bytes.is_none() {
+            self.num_bytes = config.total_bytes;
+        }
+        if self.fill_byte.is_none() {
+            self.fill_byte = config.fill_byte;
+        }
+        if !self.bytes_exact {
+            self.bytes_exact = config.bytes_exact.unwrap_or(false);
+        }
+        if !self.exact {
+            self.exact = config.exact.unwrap_or(false);
+        }
+        if self.max_depth.is_none() {
+            self.max_depth = config.max_depth;
+        }
+        if self.file_to_dir_ratio.is_none() {
+            self.file_to_dir_ratio = config.ftd_ratio;
+        }
+        if self.seed.is_none() {
+            self.seed = config.seed;
+        }
+    }
 }
 
 impl TryFrom<Generate> for Generator {
     type Error = NumFilesWithRatioError;
-
     fn try_from(
         Generate {
             root_dir,
@@ -138,12 +175,23 @@ impl TryFrom<Generate> for Generator {
             num_bytes,
             fill_byte,
             bytes_exact,
-            exact: _,
+            exact,
             max_depth,
             file_to_dir_ratio,
             seed,
         }: Generate,
     ) -> Result<Self, Self::Error> {
+        let num_files = num_files.ok_or(NumFilesWithRatioError::InvalidRatio {
+            num_files: NonZeroU64::new(1).unwrap(),
+            file_to_dir_ratio: NonZeroU64::new(2).unwrap(),
+        })?;
+        let files_exact = files_exact || exact;
+        let num_bytes = num_bytes.unwrap_or(0);
+        let bytes_exact = bytes_exact || exact;
+
+        let max_depth = max_depth.unwrap_or(5);
+        let seed = seed.unwrap_or(0);
+
         let builder = Self::builder();
         let builder = builder.root_dir(root_dir);
         let builder = builder.files_exact(files_exact);
@@ -169,12 +217,12 @@ mod generate_tests {
     fn params_are_mapped_correctly() {
         let options = Generate {
             root_dir: PathBuf::from("abc"),
-            num_files: NonZeroU64::new(373).unwrap(),
-            num_bytes: 637,
+            num_files: Some(NonZeroU64::new(373).unwrap()),
+            num_bytes: Some(637),
             fill_byte: None,
-            max_depth: 43,
+            max_depth: Some(43),
             file_to_dir_ratio: Some(NonZeroU64::new(37).unwrap()),
-            seed: 775,
+            seed: Some(775),
             files_exact: false,
             bytes_exact: false,
             exact: false,
@@ -198,6 +246,8 @@ pub enum CliError {
     Generator,
     #[error("An argument combination was invalid.")]
     InvalidArgs,
+    #[error("The number of files to generate must be specified via --files or configuration.")]
+    MissingNumFiles,
 }
 
 #[cfg(feature = "trace")]
@@ -264,11 +314,21 @@ fn main() -> ExitCode {
 
 fn ftzz(
     Ftzz {
-        options,
+        mut options,
         verbose: _,
         help: _,
+        config_file,
     }: Ftzz,
 ) -> error_stack::Result<(), CliError> {
+    if let Some(path) = config_file {
+        let config = Config::from_file(&path).change_context(CliError::InvalidArgs)?;
+        options.merge(&config);
+    }
+
+    if options.num_files.is_none() {
+        return Err(error_stack::report!(CliError::MissingNumFiles));
+    }
+
     let stdout = stdout();
     Generator::try_from(options)
         .change_context(CliError::InvalidArgs)?
