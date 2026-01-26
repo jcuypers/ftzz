@@ -109,6 +109,48 @@ impl AuditTrail {
         wtr.flush()?;
         Ok(())
     }
+
+    pub fn write_sqlite(&self, path: &Path) -> rusqlite::Result<()> {
+        let entries = self.entries.lock().unwrap();
+        let mut conn = rusqlite::Connection::open(path)?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS audit_entries (
+                path TEXT NOT NULL,
+                type TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                hash TEXT,
+                permissions INTEGER,
+                owner TEXT
+            )",
+            [],
+        )?;
+
+        let tx = conn.transaction()?;
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO audit_entries (path, type, size, hash, permissions, owner)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            )?;
+
+            for entry in entries.iter() {
+                stmt.execute(rusqlite::params![
+                    entry.path.to_string_lossy(),
+                    match entry.entry_type {
+                        EntryType::File => "file",
+                        EntryType::Directory => "directory",
+                    },
+                    entry.size,
+                    entry.hash,
+                    entry.permissions,
+                    entry.owner,
+                ])?;
+            }
+        }
+        tx.commit()?;
+
+        Ok(())
+    }
 }
 
 pub struct HashingWriter<W: Write> {

@@ -36,6 +36,7 @@ tracing-tracy = { version = "0.11.4", features = ["flush-on-exit"], optional = t
 tracy-client = { version = "0.18.2", optional = true }
 twox-hash = "2.1.2"
 csv = "1.4.0"
+rusqlite = { version = "0.33.0", features = ["bundled"] }
 
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1.0.8", features = ["fs", "thread"] }

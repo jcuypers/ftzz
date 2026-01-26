@@ -65,3 +65,43 @@ fn test_audit_trail_with_bytes() {
     
     assert!(has_hash, "Files with content should have hashes");
 }
+
+#[test]
+fn test_audit_trail_sqlite() {
+    let temp = TempDir::new().unwrap();
+    let root_dir = temp.path().join("output");
+    let audit_file = temp.path().join("audit.db");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_ftzz"))
+        .arg(&root_dir)
+        .arg("-n")
+        .arg("10")
+        .arg("--audit-output")
+        .arg(&audit_file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    
+    // Verify audit file was created
+    assert!(audit_file.exists());
+    
+    // Verify SQLite content
+    let conn = rusqlite::Connection::open(&audit_file).unwrap();
+    let count: u32 = conn.query_row("SELECT count(*) FROM audit_entries", [], |row| row.get(0)).unwrap();
+    assert!(count > 0);
+
+    let has_file: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM audit_entries WHERE type = 'file')",
+        [],
+        |row| row.get(0),
+    ).unwrap();
+    assert!(has_file);
+
+    let has_dir: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM audit_entries WHERE type = 'directory')",
+        [],
+        |row| row.get(0),
+    ).unwrap();
+    assert!(has_dir);
+}

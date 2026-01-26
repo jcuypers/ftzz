@@ -9,6 +9,7 @@ use std::{
     fmt::Write,
     fs::create_dir_all,
     hash::{DefaultHasher, Hash, Hasher},
+    io,
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
     process::ExitCode,
@@ -392,10 +393,16 @@ fn run_generator(config: Configuration) -> Result<GeneratorStats, Error> {
         log!(Level::Info, "Post-processing audit trail...");
         trail.calculate_directory_sizes();
         log!(Level::Info, "Writing audit trail to {output:?}...");
-        trail.write_csv(output)
-            .attach_printable_lazy(|| format!("Failed to write audit trail to {output:?}"))
-            .change_context(Error::Io)
-            .attach(ExitCode::from(sysexits::ExitCode::IoErr))?;
+        let extension = output.extension().and_then(|s| s.to_str());
+        match extension {
+            Some("db" | "sqlite") => trail
+                .write_sqlite(output)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e)),
+            _ => trail.write_csv(output),
+        }
+        .attach_printable_lazy(|| format!("Failed to write audit trail to {output:?}"))
+        .change_context(Error::Io)
+        .attach(ExitCode::from(sysexits::ExitCode::IoErr))?;
     }
 
     res
