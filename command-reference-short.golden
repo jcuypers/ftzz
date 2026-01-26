@@ -18,6 +18,7 @@ Options:
   -r, --ftd-ratio <FILE_TO_DIR_RATIO>  The number of files to generate per directory (default: files
                                        / 1000)
       --seed <SEED>                    Change the PRNG's starting seed [default: 0]
+  -a, --audit-output <AUDIT_OUTPUT>     Write an audit log of all generated files to this path
   -h, --help                           Print help (use `--help` for more detail)
   -q, --quiet...                       Decrease logging verbosity
   -v, --verbose...                     Increase logging verbosity

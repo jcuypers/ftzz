@@ -1,8 +1,6 @@
-use std::{fs::create_dir_all, io, io::ErrorKind::NotFound};
+use std::{fs::create_dir_all, io, io::ErrorKind::NotFound, sync::Arc};
 
 use error_stack::{Report, Result, ResultExt};
-
-use std::sync::Arc;
 
 use crate::{
     core::{audit::AuditTrail, file_contents::FileContentsGenerator},
@@ -49,19 +47,20 @@ pub fn create_files_and_dirs(
         &mut file_contents,
         audit_trail.as_deref(),
     )
-    .map(|bytes_written| {
-        GeneratorTaskOutcome {
-            files_generated: num_files,
-            dirs_generated: num_dirs,
-            bytes_generated: bytes_written,
+    .map(|bytes_written| GeneratorTaskOutcome {
+        files_generated: num_files,
+        dirs_generated: num_dirs,
+        bytes_generated: bytes_written,
 
-            pool_return_file: target_dir,
-            pool_return_byte_counts: file_contents.byte_counts_pool_return(),
-        }
+        pool_return_file: target_dir,
+        pool_return_byte_counts: file_contents.byte_counts_pool_return(),
     })
 }
 
-#[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(audit_trail)))]
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(level = "trace", skip(audit_trail))
+)]
 fn create_dirs(
     num_dirs: usize,
     dir: &mut FastPathBuf,

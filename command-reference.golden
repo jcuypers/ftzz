@@ -66,6 +66,9 @@ Options:
           
           [default: 0]
 
+  -a, --audit-output <AUDIT_OUTPUT>
+          Write an audit log of all generated files to this path
+
   -h, --help
           Print help (use `-h` for a summary)
 

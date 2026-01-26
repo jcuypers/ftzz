@@ -123,52 +123,13 @@ struct Generate {
     ///
     /// For example, you can use bash's `$RANDOM` function.
     #[arg(long = "seed", alias = "entropy")]
-<<<<<<< HEAD
     #[arg(default_value = "0")]
     seed: u64,
-=======
-    #[arg(help = "Change the PRNG's starting seed [default: 0]")]
-    seed: Option<u64>,
 
-    /// Audit trail output file path (json, csv, or sqlite)
-    #[arg(long, value_hint = ValueHint::FilePath)]
+    /// Write an audit log of all generated files to this path
+    #[arg(short = 'a', long = "audit-output", alias = "audit-output")]
+    #[arg(value_hint = ValueHint::FilePath)]
     audit_output: Option<PathBuf>,
-}
-
-impl Generate {
-    fn merge(&mut self, config: &Config) {
-        if self.num_files.is_none() {
-            self.num_files = config.files;
-        }
-        if !self.files_exact {
-            self.files_exact = config.files_exact.unwrap_or(false);
-        }
-        if self.num_bytes.is_none() {
-            self.num_bytes = config.total_bytes;
-        }
-        if self.fill_byte.is_none() {
-            self.fill_byte = config.fill_byte;
-        }
-        if !self.bytes_exact {
-            self.bytes_exact = config.bytes_exact.unwrap_or(false);
-        }
-        if !self.exact {
-            self.exact = config.exact.unwrap_or(false);
-        }
-        if self.max_depth.is_none() {
-            self.max_depth = config.max_depth;
-        }
-        if self.file_to_dir_ratio.is_none() {
-            self.file_to_dir_ratio = config.ftd_ratio;
-        }
-        if self.seed.is_none() {
-            self.seed = config.seed;
-        }
-        if self.audit_output.is_none() {
-            self.audit_output = config.audit_output.as_ref().map(PathBuf::from);
-        }
-    }
->>>>>>> d9b8f3d (basic csv audit functionality)
 }
 
 impl TryFrom<Generate> for Generator {

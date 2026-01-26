@@ -29,6 +29,8 @@ sysexits = "0.9.0"
 thiserror = "2.0.12"
 thousands = "0.2.0"
 tokio = { version = "1.46.1", features = ["rt"] }
+serde = { version = "1.0.228", features = ["derive"] }
+toml = "0.8.19"
 tracing = { version = "0.1.41", features = ["log"], optional = true }
 tracing-log = { version = "0.2.0", optional = true }
 tracing-subscriber = { version = "0.3.19", optional = true }

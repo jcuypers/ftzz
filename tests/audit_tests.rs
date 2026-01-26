@@ -1,4 +1,5 @@
 use std::{fs, process::Command};
+
 use tempfile::TempDir;
 
 #[test]
@@ -17,20 +18,20 @@ fn test_audit_trail_csv() {
         .unwrap();
 
     assert!(output.status.success());
-    
+
     // Verify audit file was created
     assert!(audit_file.exists());
-    
+
     // Read and verify CSV content
     let content = fs::read_to_string(&audit_file).unwrap();
     let lines: Vec<&str> = content.lines().collect();
-    
+
     // Should have header + entries
     assert!(lines.len() > 1);
-    
+
     // Verify header
     assert_eq!(lines[0], "path,type,size,hash,permissions,owner");
-    
+
     // Verify at least some entries exist
     assert!(lines.iter().any(|line| line.contains(",file,")));
     assert!(lines.iter().any(|line| line.contains(",directory,")));
@@ -54,15 +55,15 @@ fn test_audit_trail_with_bytes() {
         .unwrap();
 
     assert!(output.status.success());
-    
+
     let content = fs::read_to_string(&audit_file).unwrap();
-    
+
     // Files with content should have hashes
     let has_hash = content.lines().any(|line| {
         let parts: Vec<&str> = line.split(',').collect();
         parts.len() >= 4 && parts[1] == "file" && !parts[3].is_empty()
     });
-    
+
     assert!(has_hash, "Files with content should have hashes");
 }
 
@@ -82,26 +83,32 @@ fn test_audit_trail_sqlite() {
         .unwrap();
 
     assert!(output.status.success());
-    
+
     // Verify audit file was created
     assert!(audit_file.exists());
-    
+
     // Verify SQLite content
     let conn = rusqlite::Connection::open(&audit_file).unwrap();
-    let count: u32 = conn.query_row("SELECT count(*) FROM audit_entries", [], |row| row.get(0)).unwrap();
+    let count: u32 = conn
+        .query_row("SELECT count(*) FROM audit_entries", [], |row| row.get(0))
+        .unwrap();
     assert!(count > 0);
 
-    let has_file: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM audit_entries WHERE type = 'file')",
-        [],
-        |row| row.get(0),
-    ).unwrap();
+    let has_file: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM audit_entries WHERE type = 'file')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
     assert!(has_file);
 
-    let has_dir: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM audit_entries WHERE type = 'directory')",
-        [],
-        |row| row.get(0),
-    ).unwrap();
+    let has_dir: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM audit_entries WHERE type = 'directory')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
     assert!(has_dir);
 }

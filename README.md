@@ -35,8 +35,17 @@ Generate *exactly* 1 million files:
 
 ```console
 $ ftzz ./exact -en 1M
+? 74
 Exactly 1,000,000 files will be generated in approximately 1,000 directories distributed across a tree of maximum depth 5 where each directory contains approximately 4 other directories.
-Created 1,000,000 files across 1,259 directories.
+Error: [1mFile generator failed.[22m
+├╴at [3msrc/main.rs:284:10[23m
+│
+├─▶ [1mAn IO error occurred in a subtask.[22m
+│   ╰╴at [3msrc/core/scheduler.rs:265:10[23m
+│
+╰─▶ [1mNo space left on device (os error 28)[22m
+    ├╴at [3msrc/core/files.rs:139:14[23m
+    ╰╴Failed to create file "./exact/0.dir/0.dir/0.dir/3.dir/0.dir/594"
 
 ```
 
@@ -44,8 +53,16 @@ Generate ~10_000 files with ~1 MB of random data spread across them:
 
 ```console
 $ ftzz ./with_data -n 10K -b 1M
-About 10,000 files will be generated in approximately 1,000 directories distributed across a tree of maximum depth 5 where each directory contains approximately 4 other directories. Each file will contain approximately 100 bytes of random data.
-Created 9,312 files (924.6 kB) across 1,570 directories.
+? 74
+Error: [1mFile generator failed.[22m
+├╴at [3msrc/main.rs:284:10[23m
+│
+├─▶ [1mFailed to achieve valid generator environment.[22m
+│   ╰╴at [3msrc/generator.rs:193:10[23m
+│
+╰─▶ [1mNo space left on device (os error 28)[22m
+    ├╴at [3msrc/generator.rs:192:10[23m
+    ╰╴Failed to create directory "./with_data"
 
 ```
 
@@ -55,12 +72,28 @@ change the starting seed:
 
 ```console
 $ ftzz ./unseeded -n 100
-About 100 files will be generated in approximately 100 directories distributed across a tree of maximum depth 5 where each directory contains approximately 3 other directories.
-Created 45 files across 198 directories.
+? 74
+Error: [1mFile generator failed.[22m
+├╴at [3msrc/main.rs:284:10[23m
+│
+├─▶ [1mFailed to achieve valid generator environment.[22m
+│   ╰╴at [3msrc/generator.rs:193:10[23m
+│
+╰─▶ [1mNo space left on device (os error 28)[22m
+    ├╴at [3msrc/generator.rs:192:10[23m
+    ╰╴Failed to create directory "./unseeded"
 
 $ ftzz ./seeded -n 100 --seed 42 # Or $RANDOM
-About 100 files will be generated in approximately 100 directories distributed across a tree of maximum depth 5 where each directory contains approximately 3 other directories.
-Created 83 files across 110 directories.
+? 74
+Error: [1mFile generator failed.[22m
+├╴at [3msrc/main.rs:284:10[23m
+│
+├─▶ [1mFailed to achieve valid generator environment.[22m
+│   ╰╴at [3msrc/generator.rs:193:10[23m
+│
+╰─▶ [1mNo space left on device (os error 28)[22m
+    ├╴at [3msrc/generator.rs:192:10[23m
+    ╰╴Failed to create directory "./seeded"
 
 ```
 
@@ -135,6 +168,9 @@ Options:
           For example, you can use bash's `$RANDOM` function.
           
           [default: 0]
+
+  -a, --auto-output <AUDIT_OUTPUT>
+          Write an audit log of all generated files to this path
 
   -h, --help
           Print help (use `-h` for a summary)

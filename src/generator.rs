@@ -13,6 +13,7 @@ use std::{
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
     process::ExitCode,
+    sync::Arc,
     thread,
 };
 
@@ -24,8 +25,6 @@ use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
 use thiserror::Error;
 use thousands::Separable;
-
-use std::sync::Arc;
 
 use crate::core::{
     DynamicGenerator, GeneratorBytes, GeneratorStats, StaticGenerator, audit::AuditTrail, run,
@@ -383,11 +382,13 @@ fn run_generator(config: Configuration) -> Result<GeneratorStats, Error> {
 
     log!(Level::Info, "Starting config: {config:?}");
     let audit_output = config.audit_output.clone();
-    let audit_trail = audit_output
-        .as_ref()
-        .map(|_| Arc::new(AuditTrail::new()));
+    let audit_trail = audit_output.as_ref().map(|_| Arc::new(AuditTrail::new()));
 
-    let res = runtime.block_on(run_generator_async(config, parallelism, audit_trail.clone()));
+    let res = runtime.block_on(run_generator_async(
+        config,
+        parallelism,
+        audit_trail.clone(),
+    ));
 
     if let (Ok(_), Some(output), Some(trail)) = (&res, &audit_output, &audit_trail) {
         log!(Level::Info, "Post-processing audit trail...");
@@ -395,9 +396,7 @@ fn run_generator(config: Configuration) -> Result<GeneratorStats, Error> {
         log!(Level::Info, "Writing audit trail to {output:?}...");
         let extension = output.extension().and_then(|s| s.to_str());
         match extension {
-            Some("db" | "sqlite") => trail
-                .write_sqlite(output)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e)),
+            Some("db" | "sqlite") => trail.write_sqlite(output).map_err(io::Error::other),
             _ => trail.write_csv(output),
         }
         .attach_printable_lazy(|| format!("Failed to write audit trail to {output:?}"))

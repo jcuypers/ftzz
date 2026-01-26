@@ -222,7 +222,9 @@ fn write_bytes<'a, R: RngCore + 'static>(
     if let Some(seed) = hash_seed {
         let mut writer = HashingWriter::new(file, seed);
         let copied = match kind.into() {
-            BytesKind::Random(random) => io::copy(&mut random.read_adapter().take(num), &mut writer),
+            BytesKind::Random(random) => {
+                io::copy(&mut random.read_adapter().take(num), &mut writer)
+            }
             BytesKind::Fixed(byte) => io::copy(&mut io::repeat(byte).take(num), &mut writer),
         }?;
         debug_assert_eq!(num, copied);
