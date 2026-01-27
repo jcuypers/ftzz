@@ -76,7 +76,7 @@ fn create_dirs(
             .attach_printable_lazy(|| format!("Failed to create directory {dir:?}"))?;
 
         if let Some(audit) = audit_trail {
-            audit.add_directory(dir.to_path_buf());
+            audit.add_directory(dir.to_path_buf(), None);
         }
 
         dir.pop();
@@ -110,7 +110,13 @@ fn create_files(
             Ok((bytes, hash)) => {
                 bytes_written += bytes;
                 if let Some(audit) = audit_trail {
-                    audit.add_file(guard.to_path_buf(), bytes, hash, first_spec.is_duplicate);
+                    audit.add_file(
+                        guard.to_path_buf(),
+                        bytes,
+                        hash,
+                        first_spec.is_duplicate,
+                        first_spec.permission,
+                    );
                 }
                 start_file += 1;
                 guard.pop();
@@ -150,7 +156,13 @@ fn create_files(
 
         bytes_written += bytes;
         if let Some(audit) = audit_trail {
-            audit.add_file(file.to_path_buf(), bytes, hash, spec.is_duplicate);
+            audit.add_file(
+                file.to_path_buf(),
+                bytes,
+                hash,
+                spec.is_duplicate,
+                spec.permission,
+            );
         }
 
         file.pop();

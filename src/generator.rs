@@ -111,6 +111,8 @@ pub struct Generator {
     pub duplicate_percentage: Option<f64>,
     pub max_duplicates_per_file: Option<NonZeroUsize>,
     pub audit_output: Option<PathBuf>,
+    #[builder(default)]
+    pub permissions: Vec<u32>,
 }
 
 #[cfg(test)]
@@ -168,6 +170,7 @@ struct Configuration {
     duplicate_percentage: f64,
     max_duplicates_per_file: NonZeroUsize,
     audit_output: Option<PathBuf>,
+    permissions: Vec<u32>,
     human_info: HumanInfo,
 }
 
@@ -192,6 +195,7 @@ fn validated_options(
         duplicate_percentage,
         max_duplicates_per_file,
         audit_output,
+        permissions,
     }: Generator,
 ) -> Result<Configuration, Error> {
     create_dir_all(&root_dir)
@@ -231,6 +235,7 @@ fn validated_options(
             duplicate_percentage,
             max_duplicates_per_file,
             audit_output,
+            permissions,
             human_info: HumanInfo {
                 dirs_per_dir: 0,
                 total_dirs: 1,
@@ -262,6 +267,7 @@ fn validated_options(
         duplicate_percentage,
         max_duplicates_per_file,
         audit_output,
+        permissions,
         human_info: HumanInfo {
             dirs_per_dir: dirs_per_dir.round() as usize,
             total_dirs: num_dirs.round() as usize,
@@ -295,6 +301,7 @@ fn print_configuration_info(
                 total_dirs,
                 bytes_per_files,
             },
+        permissions: _,
     }: &Configuration,
     output: &mut impl Write,
 ) -> Result<(), Error> {
@@ -442,6 +449,7 @@ async fn run_generator_async(
         duplicate_percentage,
         max_duplicates_per_file,
         audit_output:_,
+        permissions,
         human_info: _,
     }: Configuration,
     parallelism: NonZeroUsize,
@@ -473,6 +481,7 @@ async fn run_generator_async(
         duplicate_percentage,
         max_duplicates_per_file,
         audit_trail,
+        permissions,
         pending_duplicates: Vec::new(),
     };
 

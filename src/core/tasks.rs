@@ -60,7 +60,7 @@ pub trait TaskGenerator {
     tracing::instrument(level = "trace", skip(params))
 )]
 fn queue(
-    mut params: GeneratorTaskParams<impl FileContentsGenerator + Send + 'static>,
+    params: GeneratorTaskParams<impl FileContentsGenerator + Send + 'static>,
     done: bool,
 ) -> QueueResult {
     if !params.file_objs.is_empty() || params.num_dirs > 0 {
@@ -121,17 +121,25 @@ pub struct DynamicGenerator<R> {
     pub max_duplicates_per_file: std::num::NonZeroUsize,
     pub pending_duplicates: Vec<PendingDuplicate>,
     pub audit_trail: Option<Arc<AuditTrail>>,
+    pub permissions: Vec<u32>,
 }
 
 fn generate_primary_specs(
     num_files: u64,
     rng: &mut impl RngCore,
+    permissions: &[u32],
 ) -> Vec<FileSpec> {
     let mut specs = Vec::with_capacity(num_files as usize);
     for _ in 0..num_files {
+        let seed = rng.next_u64();
         specs.push(FileSpec {
-            seed: rng.next_u64(),
+            seed,
             is_duplicate: false,
+            permission: if permissions.is_empty() {
+                None
+            } else {
+                Some(permissions[(seed % permissions.len() as u64) as usize])
+            },
         });
     }
     specs
@@ -144,6 +152,7 @@ fn add_duplicates_to_specs_and_buffer(
     duplicate_percentage: f64,
     max_duplicates_per_file: std::num::NonZeroUsize,
     rng: &mut impl RngCore,
+    permissions: &[u32],
 ) {
     let num_files = specs.len() as u64;
     if num_files == 0 || duplicate_percentage <= 0.0 {
@@ -194,6 +203,11 @@ fn add_duplicates_to_specs_and_buffer(
                 let spec = FileSpec {
                     seed: original_seed,
                     is_duplicate: true,
+                    permission: if permissions.is_empty() {
+                        None
+                    } else {
+                        Some(permissions[(original_seed % permissions.len() as u64) as usize])
+                    },
                 };
                 
                 // Hybrid approach: 50% chance to scatter, 50% chance to keep local
@@ -247,12 +261,13 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
             max_duplicates_per_file,
             ref audit_trail,
             ref mut pending_duplicates,
+            ref permissions,
         } = *self;
 
         let num_files = sample_truncated(num_files_distr, random);
         let num_dirs = dirs_to_gen(num_files, gen_dirs, num_dirs_distr, random);
 
-        let mut file_specs = generate_primary_specs(num_files, random);
+        let mut file_specs = generate_primary_specs(num_files, random, permissions);
         
         // Use a separate RNG for duplicates to avoid affecting the primary structure sequence
         let mut dup_rng = random.clone();
@@ -264,7 +279,8 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
                 pending_duplicates,
                 duplicate_percentage, 
                 max_duplicates_per_file, 
-                &mut dup_rng
+                &mut dup_rng,
+                permissions,
             );
             
             // Inject pending (LIFO for efficiency)
@@ -320,7 +336,7 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
     ) -> QueueResult {
         let Self {
              ref pending_duplicates,
-             ref audit_trail,
+             audit_trail: _,
              ..
         } = *self;
         
@@ -401,6 +417,7 @@ pub struct StaticGenerator<R> {
     pub num_dirs_distr: Normal<f64>,
     pub bytes: Option<GeneratorBytes>,
     pub pending_duplicates: Vec<PendingDuplicate>,
+    pub permissions: Vec<u32>,
 }
 
 impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
@@ -417,6 +434,7 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
             max_duplicates_per_file,
             audit_trail,
             pending_duplicates,
+            permissions,
         } = dynamic;
         debug_assert!(files_exact.is_some() || bytes_exact.is_some());
         Self {
@@ -431,6 +449,7 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
             num_dirs_distr,
             bytes,
             pending_duplicates,
+            permissions,
         }
     }
 
@@ -471,9 +490,10 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
             num_dirs_distr: _,
             bytes: ref bytes_opt,
             ref mut pending_duplicates,
+            ref permissions,
         } = *self;
 
-        let mut file_specs = generate_primary_specs(num_files, random);
+        let mut file_specs = generate_primary_specs(num_files, random, permissions);
         let mut dup_rng = random.clone();
 
         if let Some(GeneratorBytes {
@@ -530,7 +550,8 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                         pending_duplicates,
                         duplicate_percentage,
                         max_duplicates_per_file,
-                        &mut dup_rng
+                        &mut dup_rng,
+                        permissions,
                     );
                 }
 
@@ -596,7 +617,8 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                         pending_duplicates,
                         duplicate_percentage,
                         max_duplicates_per_file,
-                        &mut dup_rng
+                        &mut dup_rng,
+                        permissions,
                     );
                 }
                 
@@ -657,6 +679,7 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for StaticGenerator<R> {
             ref num_dirs_distr,
             bytes: _,
             pending_duplicates: _,
+            permissions: _,
         } = *self;
 
         debug_assert!(!*done);

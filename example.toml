@@ -35,3 +35,5 @@ seed = 42
 duplicate_percentage = 10
 max_duplicates_per_file = 3
 
+permissions = ["644", "700"]
+

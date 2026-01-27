@@ -139,6 +139,9 @@ struct Generate {
     /// Maximum number of duplicates per file
     #[arg(long = "max-duplicates-per-file", value_name = "MAX")]
     max_duplicates_per_file: Option<std::num::NonZeroUsize>,
+    /// List of file permission octals to deterministically select from
+    #[arg(long = "permissions", value_name = "OCTAL", value_delimiter = ',')]
+    permissions: Option<Vec<String>>,
 }
 
 impl Generate {
@@ -179,6 +182,9 @@ impl Generate {
         if self.max_duplicates_per_file.is_none() {
             self.max_duplicates_per_file = config.max_duplicates_per_file;
         }
+        if self.permissions.is_none() {
+            self.permissions = config.permissions.clone();
+        }
     }
 }
 
@@ -199,6 +205,7 @@ impl TryFrom<Generate> for Generator {
             audit_output,
             duplicate_percentage,
             max_duplicates_per_file,
+            permissions,
         }: Generate,
     ) -> Result<Self, Self::Error> {
         let num_files = num_files.ok_or(NumFilesWithRatioError::InvalidRatio {
@@ -228,6 +235,17 @@ impl TryFrom<Generate> for Generator {
         let builder = builder.maybe_audit_output(audit_output);
         let builder = builder.maybe_duplicate_percentage(duplicate_percentage);
         let builder = builder.maybe_max_duplicates_per_file(max_duplicates_per_file);
+        let builder = builder.permissions(
+            permissions
+                .unwrap_or_default()
+                .into_iter()
+                .map(|p| u32::from_str_radix(&p, 8).map_err(|_| Cow::from(format!("Invalid octal permission: {p}"))))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| NumFilesWithRatioError::InvalidRatio {
+                    num_files: NonZeroU64::new(1).unwrap(),
+                    file_to_dir_ratio: NonZeroU64::new(2).unwrap(),
+                })?, // Hack: NumFilesWithRatioError doesn't have a generic error variant
+        );
         Ok(builder.build())
     }
 }

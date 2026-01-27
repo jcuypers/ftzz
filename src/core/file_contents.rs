@@ -1,4 +1,6 @@
-use std::{fs::File, io, io::Read};
+use std::{fs, fs::File, io, io::Read};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 use cfg_if::cfg_if;
 use rand::{RngCore, SeedableRng, TryRngCore};
@@ -41,11 +43,17 @@ impl FileContentsGenerator for NoGeneratedFileContents {
         _: bool,
         (): &mut Self::State,
         _: Option<u64>,
-        _: &FileSpec,
+        spec: &FileSpec,
     ) -> io::Result<(u64, Option<u64>)> {
+        let mode = spec.permission.unwrap_or(0o664);
         cfg_if! {
             if #[cfg(any(not(unix), miri))] {
-                File::create(file).map(|_| (0, None))
+                File::create(file).and_then(|f| {
+                    if let Some(p) = spec.permission {
+                        f.set_permissions(fs::Permissions::from_mode(p))?;
+                    }
+                    Ok((0, None))
+                })
             } else if #[cfg(target_os = "linux")] {
                 use rustix::fs::{mknodat, FileType, Mode};
 
@@ -54,7 +62,7 @@ impl FileContentsGenerator for NoGeneratedFileContents {
                     rustix::fs::CWD,
                     &*cstr,
                     FileType::RegularFile,
-                    Mode::RUSR | Mode::WUSR | Mode::RGRP | Mode::WGRP | Mode::ROTH,
+                    Mode::from_bits_retain(mode),
                     0,
                 )
                 .map_err(io::Error::from)
@@ -67,7 +75,7 @@ impl FileContentsGenerator for NoGeneratedFileContents {
                     rustix::fs::CWD,
                     &*cstr,
                     OFlags::CREATE,
-                    Mode::RUSR | Mode::WUSR | Mode::RGRP | Mode::WGRP | Mode::ROTH,
+                    Mode::from_bits_retain(mode),
                 )
                 .map_err(io::Error::from)
                 .map(|_| (0, None))
@@ -131,13 +139,17 @@ impl FileContentsGenerator for OnTheFlyGeneratedFileContents {
         
         let num_bytes = sample_truncated(num_bytes_distr, &mut file_rnd);
         if num_bytes > 0 || retryable {
-            File::create(file).and_then(|f| {
+            File::create(&*file).and_then(|f| {
                 let num_bytes = if retryable {
                     sample_truncated(num_bytes_distr, &mut file_rnd)
                 } else {
                     num_bytes
                 };
                 let hash = write_bytes(f, num_bytes, (fill_byte, &mut file_rnd), hash_seed)?;
+                #[cfg(unix)]
+                if let Some(p) = spec.permission {
+                    fs::set_permissions(file, fs::Permissions::from_mode(p))?;
+                }
                 Ok((num_bytes, hash))
             })
         } else {
@@ -192,8 +204,15 @@ impl FileContentsGenerator for PreDefinedGeneratedFileContents {
 
         let num_bytes = byte_counts[file_num];
         if num_bytes > 0 {
-            File::create(file)
-                .and_then(|f| write_bytes(f, num_bytes, (fill_byte, &mut file_rnd), hash_seed))
+            File::create(&*file)
+                .and_then(|f| {
+                    let hash = write_bytes(f, num_bytes, (fill_byte, &mut file_rnd), hash_seed)?;
+                    #[cfg(unix)]
+                    if let Some(p) = spec.permission {
+                        fs::set_permissions(file, fs::Permissions::from_mode(p))?;
+                    }
+                    Ok(hash)
+                })
                 .map(|hash| (num_bytes, hash))
         } else {
             NoGeneratedFileContents.create_file(file, file_num, retryable, &mut (), hash_seed, spec)

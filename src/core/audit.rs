@@ -39,27 +39,34 @@ impl AuditTrail {
         }
     }
 
-    pub fn add_file(&self, path: PathBuf, size: u64, hash: Option<u64>, is_duplicate: bool) {
+    pub fn add_file(
+        &self,
+        path: PathBuf,
+        size: u64,
+        hash: Option<u64>,
+        is_duplicate: bool,
+        permission: Option<u32>,
+    ) {
         let mut entries = self.entries.lock().unwrap();
         entries.push(AuditEntry {
             path,
             entry_type: EntryType::File,
             size,
             hash: hash.map(|h| format!("{h:016x}")),
-            permissions: None,
+            permissions: Some(permission.unwrap_or(0o644)),
             owner: None,
             is_duplicate,
         });
     }
 
-    pub fn add_directory(&self, path: PathBuf) {
+    pub fn add_directory(&self, path: PathBuf, permission: Option<u32>) {
         let mut entries = self.entries.lock().unwrap();
         entries.push(AuditEntry {
             path,
             entry_type: EntryType::Directory,
             size: 0, // Will be calculated later
             hash: None,
-            permissions: None,
+            permissions: Some(permission.unwrap_or(0o755)),
             owner: None,
             is_duplicate: false,
         });
@@ -132,7 +139,7 @@ impl AuditTrail {
                 type TEXT NOT NULL,
                 size INTEGER NOT NULL,
                 hash TEXT,
-                permissions INTEGER,
+                permissions TEXT,
                 owner TEXT,
                 is_duplicate BOOLEAN NOT NULL DEFAULT 0
             )",
@@ -155,7 +162,7 @@ impl AuditTrail {
                     },
                     entry.size,
                     entry.hash,
-                    entry.permissions,
+                    entry.permissions.map(|p| format!("{p:o}")),
                     entry.owner,
                     entry.is_duplicate,
                 ])?;

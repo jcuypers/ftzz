@@ -7,6 +7,7 @@ pub use tasks::{DynamicGenerator, GeneratorBytes, StaticGenerator};
 pub struct FileSpec {
     pub seed: u64,
     pub is_duplicate: bool,
+    pub permission: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy)]
