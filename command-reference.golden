@@ -11,7 +11,7 @@ named `n` and directories are named `n.dir` for a given natural number `n`.
 By default, generated files are empty, but random data can be used as the file contents with the
 `total-bytes` option.
 
-Usage: ftzz [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR>
 
 Arguments:
   <ROOT_DIR>
@@ -34,8 +34,6 @@ Options:
           
           Note: this value is probabilistically respected, meaning any amount of data may be
           generated so long as we attempt to get close to N.
-          
-          [default: 0]
 
       --fill-byte <FILL_BYTE>
           Specify a specific fill byte to be used instead of deterministically random data
@@ -49,9 +47,7 @@ Options:
           Whether or not to generate exactly N files and bytes
 
   -d, --max-depth <MAX_DEPTH>
-          The maximum directory tree depth
-          
-          [default: 5]
+          The maximum directory tree depth [default: 5]
 
   -r, --ftd-ratio <FILE_TO_DIR_RATIO>
           The number of files to generate per directory (default: files / 1000)
@@ -63,8 +59,9 @@ Options:
           Change the PRNG's starting seed
           
           For example, you can use bash's `$RANDOM` function.
-          
-          [default: 0]
+
+      --config <CONFIG_FILE>
+          Path to a TOML configuration file
 
   -a, --audit-output <AUDIT_OUTPUT>
           Write an audit log of all generated files to this path

@@ -1,0 +1,29 @@
+# Example FTZZ configuration file
+# All fields are optional
+
+# The number of files to generate
+files = 10000
+
+# Whether to generate exactly N files
+files_exact = true
+
+# Total amount of random data in bytes
+total_bytes = 0
+
+# Specific fill byte (0-255)
+# fill_byte = 0
+
+# Whether to generate exactly N bytes
+bytes_exact = false
+
+# Whether to generate exactly N files and bytes
+exact = true
+
+# Maximum directory tree depth
+max_depth = 5
+
+# Number of files per directory
+# ftd_ratio = 1000
+
+# PRNG starting seed
+seed = 42

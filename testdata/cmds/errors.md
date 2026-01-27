@@ -5,7 +5,7 @@ $ ftzz
 ? 2
 Generate a random directory hierarchy with some number of files
 
-Usage: ftzz[EXE] [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR>
 
 Arguments:
   <ROOT_DIR>  The directory in which to generate files
@@ -13,8 +13,7 @@ Arguments:
 Options:
   -n, --files <NUM_FILES>              The number of files to generate
       --files-exact                    Whether or not to generate exactly N files
-  -b, --total-bytes <NUM_BYTES>        The total amount of random data to be distributed across the
-                                       generated files [default: 0]
+  -b, --total-bytes <NUM_BYTES>        The total amount of random data [default: 0]
       --fill-byte <FILL_BYTE>          Specify a specific fill byte to be used instead of
                                        deterministically random data
       --bytes-exact                    Whether or not to generate exactly N bytes
@@ -23,7 +22,8 @@ Options:
   -r, --ftd-ratio <FILE_TO_DIR_RATIO>  The number of files to generate per directory (default: files
                                        / 1000)
       --seed <SEED>                    Change the PRNG's starting seed [default: 0]
-  -a, --auto-output <AUDIT_OUTPUT>     Write an audit log of all generated files to this path
+  -a, --audit-output <AUDIT_OUTPUT>     Write an audit log of all generated files to this path
+      --config <CONFIG_FILE>           Path to a TOML configuration file
   -h, --help                           Print help (use `--help` for more detail)
   -q, --quiet...                       Decrease logging verbosity
   -v, --verbose...                     Increase logging verbosity
@@ -40,7 +40,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz[EXE] [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR>
 
 For more information, try '--help'.
 
@@ -50,7 +50,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz[EXE] [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR>
 
 For more information, try '--help'.
 
@@ -71,7 +71,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz[EXE] [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR>
 
 For more information, try '--help'.
 
@@ -81,7 +81,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz[EXE] [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR>
 
 For more information, try '--help'.
 
@@ -96,7 +96,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz[EXE] [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR>
 
 For more information, try '--help'.
 
@@ -106,7 +106,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz[EXE] [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR>
 
 For more information, try '--help'.
 
@@ -127,7 +127,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz[EXE] [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR>
 
 For more information, try '--help'.
 
@@ -137,7 +137,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz[EXE] [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR>
 
 For more information, try '--help'.
 
