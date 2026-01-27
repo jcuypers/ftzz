@@ -162,6 +162,9 @@ impl Generate {
         if self.seed.is_none() {
             self.seed = config.seed;
         }
+        if self.audit_output.is_none() {
+            self.audit_output = config.audit_output.clone();
+        }
     }
 }
 

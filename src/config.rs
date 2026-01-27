@@ -1,9 +1,9 @@
-use std::{fs, num::NonZeroU64, path::Path};
+use std::{fs, num::NonZeroU64, path::{Path, PathBuf}};
 
 use error_stack::{Result, ResultExt};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, Default, Copy, Clone)]
+#[derive(Debug, Deserialize, Default, Clone)]
 #[serde(rename_all = "snake_case")]
 #[serde(deny_unknown_fields)]
 pub struct Config {
@@ -15,6 +15,7 @@ pub struct Config {
     pub exact: Option<bool>,
     pub max_depth: Option<u32>,
     pub ftd_ratio: Option<NonZeroU64>,
+    pub audit_output: Option<PathBuf>,
     pub seed: Option<u64>,
 }
 
