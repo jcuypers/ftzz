@@ -5,7 +5,7 @@ use rand::{RngCore, SeedableRng, TryRngCore};
 use rand_distr::Normal;
 use rand_xoshiro::Xoshiro256PlusPlus;
 
-use crate::{core::sample_truncated, utils::FastPathBuf};
+use crate::{core::{FileSpec, sample_truncated}, utils::FastPathBuf};
 
 pub trait FileContentsGenerator {
     type State;
@@ -19,6 +19,7 @@ pub trait FileContentsGenerator {
         retryable: bool,
         state: &mut Self::State,
         hash_seed: Option<u64>,
+        spec: &FileSpec,
     ) -> io::Result<(u64, Option<u64>)>;
 
     fn byte_counts_pool_return(self) -> Option<Vec<u64>>;
@@ -40,6 +41,7 @@ impl FileContentsGenerator for NoGeneratedFileContents {
         _: bool,
         (): &mut Self::State,
         _: Option<u64>,
+        _: &FileSpec,
     ) -> io::Result<(u64, Option<u64>)> {
         cfg_if! {
             if #[cfg(any(not(unix), miri))] {
@@ -102,8 +104,9 @@ impl FileContentsGenerator for OnTheFlyGeneratedFileContents {
         file: &mut FastPathBuf,
         file_num: usize,
         retryable: bool,
-        random: &mut Self::State,
+        _random: &mut Self::State,
         hash_seed: Option<u64>,
+        spec: &FileSpec,
     ) -> io::Result<(u64, Option<u64>)> {
         let Self {
             ref num_bytes_distr,
@@ -111,36 +114,34 @@ impl FileContentsGenerator for OnTheFlyGeneratedFileContents {
             fill_byte,
         } = *self;
 
-        let num_bytes = sample_truncated(num_bytes_distr, random);
+        // Use the seed from the spec for content generation if applicable.
+        // But `random` here is the state of the generator.
+        // Wait, if we want deterministic content per file based on seed, we should NOT use `random` (which is shared state).
+        // OR we should re-seed `random` or use a new RNG based on `spec.seed`.
+        
+        // Since `queue_gen` will pass unique seeds for each file, we can use `spec.seed`.
+        
+        let mut file_rnd = Xoshiro256PlusPlus::seed_from_u64(spec.seed);
+        // We use local RNG for this file.
+        // But `create_file` signature takes `random: &mut Self::State`.
+        // We should ignore `random` for content generation if we use `spec.seed`.
+        // However, `random` might be used for other things? No, it's `OnTheFlyGeneratedFileContents`.
+        // The `random` passed in is the generator's state. 
+        // If we want deterministic per file, we should use `spec.seed`.
+        
+        let num_bytes = sample_truncated(num_bytes_distr, &mut file_rnd);
         if num_bytes > 0 || retryable {
             File::create(file).and_then(|f| {
-                // To stay deterministic, we need to ensure `random` is mutated in exactly
-                // the same way regardless of whether or not creating the file fails and
-                // needs to be retried. To do this, we always run num_to_generate() twice
-                // for the initial file creation attempt. Thus, the branching looks like
-                // this:
-                //
-                // FAILURE
-                // 1. Call num_to_generate() in initial retry-aware if check
-                // 2. Perform retry by moving to for loop
-                // 3. Call write_random_bytes(num_to_generate())
-                //
-                // SUCCESS
-                // 1. Call num_to_generate() in initial retry-aware if check
-                //    - This value is ignored.
-                // 2. Call write_random_bytes(num_to_generate()) below
-                //    - Notice that num_to_generate can be 0 which is a bummer b/c we can't use
-                //      mknod even though we'd like to.
                 let num_bytes = if retryable {
-                    sample_truncated(num_bytes_distr, random)
+                    sample_truncated(num_bytes_distr, &mut file_rnd)
                 } else {
                     num_bytes
                 };
-                let hash = write_bytes(f, num_bytes, (fill_byte, random), hash_seed)?;
+                let hash = write_bytes(f, num_bytes, (fill_byte, &mut file_rnd), hash_seed)?;
                 Ok((num_bytes, hash))
             })
         } else {
-            NoGeneratedFileContents.create_file(file, file_num, retryable, &mut (), hash_seed)
+            NoGeneratedFileContents.create_file(file, file_num, retryable, &mut (), hash_seed, spec)
         }
     }
 
@@ -172,8 +173,9 @@ impl FileContentsGenerator for PreDefinedGeneratedFileContents {
         file: &mut FastPathBuf,
         file_num: usize,
         retryable: bool,
-        random: &mut Self::State,
+        _random: &mut Self::State,
         hash_seed: Option<u64>,
+        spec: &FileSpec,
     ) -> io::Result<(u64, Option<u64>)> {
         let Self {
             ref byte_counts,
@@ -181,13 +183,20 @@ impl FileContentsGenerator for PreDefinedGeneratedFileContents {
             fill_byte,
         } = *self;
 
+        // For PreDefined, we use the byte counts.
+        // But for content generation (if random bytes), we should use `spec.seed`?
+        // PreDefinedGeneratedFileContents usually has a shared RNG state.
+        // If we want duplicate files to be identical, we must use `spec.seed`.
+        
+        let mut file_rnd = Xoshiro256PlusPlus::seed_from_u64(spec.seed);
+
         let num_bytes = byte_counts[file_num];
         if num_bytes > 0 {
             File::create(file)
-                .and_then(|f| write_bytes(f, num_bytes, (fill_byte, random), hash_seed))
+                .and_then(|f| write_bytes(f, num_bytes, (fill_byte, &mut file_rnd), hash_seed))
                 .map(|hash| (num_bytes, hash))
         } else {
-            NoGeneratedFileContents.create_file(file, file_num, retryable, &mut (), hash_seed)
+            NoGeneratedFileContents.create_file(file, file_num, retryable, &mut (), hash_seed, spec)
         }
     }
 

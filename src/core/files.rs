@@ -3,13 +3,14 @@ use std::{fs::create_dir_all, io, io::ErrorKind::NotFound, sync::Arc};
 use error_stack::{Report, Result, ResultExt};
 
 use crate::{
-    core::{audit::AuditTrail, file_contents::FileContentsGenerator},
     utils::{FastPathBuf, with_dir_name, with_file_name},
 };
 
+use crate::core::{FileSpec, audit::AuditTrail, file_contents::FileContentsGenerator};
+
 pub struct GeneratorTaskParams<G: FileContentsGenerator> {
     pub target_dir: FastPathBuf,
-    pub num_files: u64,
+    pub file_objs: Vec<FileSpec>,
     pub num_dirs: usize,
     pub file_offset: u64,
     pub file_contents: G,
@@ -32,16 +33,17 @@ pub struct GeneratorTaskOutcome {
 pub fn create_files_and_dirs(
     GeneratorTaskParams {
         mut target_dir,
-        num_files,
+        file_objs,
         num_dirs,
         file_offset,
         mut file_contents,
         audit_trail,
     }: GeneratorTaskParams<impl FileContentsGenerator>,
 ) -> Result<GeneratorTaskOutcome, io::Error> {
+    let num_files = file_objs.len() as u64;
     create_dirs(num_dirs, &mut target_dir, audit_trail.as_deref())?;
     create_files(
-        num_files,
+        file_objs,
         file_offset,
         &mut target_dir,
         &mut file_contents,
@@ -49,6 +51,7 @@ pub fn create_files_and_dirs(
     )
     .map(|bytes_written| GeneratorTaskOutcome {
         files_generated: num_files,
+
         dirs_generated: num_dirs,
         bytes_generated: bytes_written,
 
@@ -86,7 +89,7 @@ fn create_dirs(
     tracing::instrument(level = "trace", skip(contents, audit_trail))
 )]
 fn create_files(
-    num_files: u64,
+    file_objs: Vec<FileSpec>,
     offset: u64,
     file: &mut FastPathBuf,
     contents: &mut impl FileContentsGenerator,
@@ -98,14 +101,16 @@ fn create_files(
     let hash_seed = audit_trail.is_some().then_some(0); // Using 0 as default seed for xxhash
 
     let mut start_file = 0;
-    if num_files > 0 {
+    
+    // We only try to create the parent dir for the first file if there are any files.
+    if let Some(first_spec) = file_objs.first() {
         let mut guard = with_file_name(offset, |s| file.push(s));
 
-        match contents.create_file(&mut guard, 0, true, &mut state, hash_seed) {
+        match contents.create_file(&mut guard, 0, true, &mut state, hash_seed, first_spec) {
             Ok((bytes, hash)) => {
                 bytes_written += bytes;
                 if let Some(audit) = audit_trail {
-                    audit.add_file(guard.to_path_buf(), bytes, hash);
+                    audit.add_file(guard.to_path_buf(), bytes, hash, first_spec.is_duplicate);
                 }
                 start_file += 1;
                 guard.pop();
@@ -125,8 +130,12 @@ fn create_files(
             }
         }
     }
-    for i in start_file..num_files {
-        let mut file = with_file_name(i + offset, |s| file.push(s));
+    for (i, spec) in file_objs.iter().enumerate().skip(start_file) {
+        // For duplicates, we might want a different naming scheme or just monotonic?
+        // The spec implies we just want to create 'a file' with specific content.
+        // The original code used `i + offset` for naming.
+        // We will continue to use monotonic naming for valid filenames.
+        let mut file = with_file_name((i as u64) + offset, |s| file.push(s));
 
         let (bytes, hash) = contents
             .create_file(
@@ -135,12 +144,13 @@ fn create_files(
                 false,
                 &mut state,
                 hash_seed,
+                spec,
             )
             .attach_printable_lazy(|| format!("Failed to create file {file:?}"))?;
 
         bytes_written += bytes;
         if let Some(audit) = audit_trail {
-            audit.add_file(file.to_path_buf(), bytes, hash);
+            audit.add_file(file.to_path_buf(), bytes, hash, spec.is_duplicate);
         }
 
         file.pop();

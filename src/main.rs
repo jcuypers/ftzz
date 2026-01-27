@@ -131,6 +131,14 @@ struct Generate {
     audit_output: Option<PathBuf>,
     #[arg(help = "Change the PRNG's starting seed [default: 0]")]
     seed: Option<u64>,
+
+    /// Percentage of additional duplicate files to generate (relative to the number of files)
+    #[arg(long = "duplicate-percentage", value_name = "PERCENTAGE")]
+    duplicate_percentage: Option<f64>,
+
+    /// Maximum number of duplicates per file
+    #[arg(long = "max-duplicates-per-file", value_name = "MAX")]
+    max_duplicates_per_file: Option<std::num::NonZeroUsize>,
 }
 
 impl Generate {
@@ -165,6 +173,12 @@ impl Generate {
         if self.audit_output.is_none() {
             self.audit_output = config.audit_output.clone();
         }
+        if self.duplicate_percentage.is_none() {
+            self.duplicate_percentage = config.duplicate_percentage;
+        }
+        if self.max_duplicates_per_file.is_none() {
+            self.max_duplicates_per_file = config.max_duplicates_per_file;
+        }
     }
 }
 
@@ -183,6 +197,8 @@ impl TryFrom<Generate> for Generator {
             file_to_dir_ratio,
             seed,
             audit_output,
+            duplicate_percentage,
+            max_duplicates_per_file,
         }: Generate,
     ) -> Result<Self, Self::Error> {
         let num_files = num_files.ok_or(NumFilesWithRatioError::InvalidRatio {
@@ -210,6 +226,8 @@ impl TryFrom<Generate> for Generator {
             builder.num_files_with_ratio(NumFilesWithRatio::from_num_files(num_files))
         };
         let builder = builder.maybe_audit_output(audit_output);
+        let builder = builder.maybe_duplicate_percentage(duplicate_percentage);
+        let builder = builder.maybe_max_duplicates_per_file(max_duplicates_per_file);
         Ok(builder.build())
     }
 }
@@ -232,6 +250,8 @@ mod generate_tests {
             bytes_exact: false,
             exact: false,
             audit_output: None,
+            duplicate_percentage: None,
+            max_duplicates_per_file: None,
         };
 
         let generator = Generator::try_from(options).unwrap();

@@ -3,6 +3,18 @@ use rand_distr::{Distribution, Normal};
 pub use scheduler::{GeneratorStats, run};
 pub use tasks::{DynamicGenerator, GeneratorBytes, StaticGenerator};
 
+#[derive(Debug, Clone, Copy)]
+pub struct FileSpec {
+    pub seed: u64,
+    pub is_duplicate: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PendingDuplicate {
+    pub spec: FileSpec,
+    pub size: Option<u64>,
+}
+
 pub mod audit;
 mod file_contents;
 mod files;

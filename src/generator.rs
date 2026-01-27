@@ -108,6 +108,8 @@ pub struct Generator {
     max_depth: u32,
     #[builder(default = 0)]
     seed: u64,
+    pub duplicate_percentage: Option<f64>,
+    pub max_duplicates_per_file: Option<NonZeroUsize>,
     pub audit_output: Option<PathBuf>,
 }
 
@@ -163,6 +165,8 @@ struct Configuration {
     bytes_per_file: f64,
     max_depth: u32,
     seed: u64,
+    duplicate_percentage: f64,
+    max_duplicates_per_file: NonZeroUsize,
     audit_output: Option<PathBuf>,
     human_info: HumanInfo,
 }
@@ -185,6 +189,8 @@ fn validated_options(
         bytes_exact,
         max_depth,
         seed,
+        duplicate_percentage,
+        max_duplicates_per_file,
         audit_output,
     }: Generator,
 ) -> Result<Configuration, Error> {
@@ -207,6 +213,8 @@ fn validated_options(
 
     let num_files = num_files_with_ratio.num_files.get() as f64;
     let bytes_per_file = num_bytes as f64 / num_files;
+    let duplicate_percentage = duplicate_percentage.unwrap_or(0.0);
+    let max_duplicates_per_file = max_duplicates_per_file.unwrap_or(NonZeroUsize::new(1).unwrap());
 
     if max_depth == 0 {
         return Ok(Configuration {
@@ -220,6 +228,8 @@ fn validated_options(
             bytes_per_file,
             max_depth: 0,
             seed,
+            duplicate_percentage,
+            max_duplicates_per_file,
             audit_output,
             human_info: HumanInfo {
                 dirs_per_dir: 0,
@@ -249,6 +259,8 @@ fn validated_options(
             (num_files_with_ratio, max_depth, seed).hash(&mut hasher);
             hasher.finish()
         },
+        duplicate_percentage,
+        max_duplicates_per_file,
         audit_output,
         human_info: HumanInfo {
             dirs_per_dir: dirs_per_dir.round() as usize,
@@ -274,6 +286,8 @@ fn print_configuration_info(
         bytes_per_file: _,
         max_depth,
         seed: _,
+        duplicate_percentage,
+        max_duplicates_per_file: _,
         audit_output: _,
         human_info:
             HumanInfo {
@@ -288,7 +302,7 @@ fn print_configuration_info(
         output,
         "{file_count_type} {} {files_maybe_plural} will be generated in approximately {} \
          {directories_maybe_plural} distributed across a tree of maximum depth {} where each \
-         directory contains approximately {} other {dpd_directories_maybe_plural}.{bytes_info}",
+         directory contains approximately {} other {dpd_directories_maybe_plural}.{bytes_info}{duplicate_info}",
         files.separate_with_commas(),
         total_dirs.separate_with_commas(),
         max_depth.separate_with_commas(),
@@ -325,6 +339,11 @@ fn print_configuration_info(
                     String::new()
                 },
             )
+        } else {
+            String::new()
+        },
+        duplicate_info = if duplicate_percentage > 0.0 {
+            format!(" Approximately {:.0}% of additional duplicate files will be generated.", duplicate_percentage)
         } else {
             String::new()
         },
@@ -420,7 +439,9 @@ async fn run_generator_async(
         bytes_per_file,
         max_depth,
         seed,
-        audit_output: _,
+        duplicate_percentage,
+        max_duplicates_per_file,
+        audit_output:_,
         human_info: _,
     }: Configuration,
     parallelism: NonZeroUsize,
@@ -449,7 +470,10 @@ async fn run_generator_async(
             num_bytes_distr: truncatable_normal(bytes_per_file),
             fill_byte,
         }),
+        duplicate_percentage,
+        max_duplicates_per_file,
         audit_trail,
+        pending_duplicates: Vec::new(),
     };
 
     if files_exact || (bytes_exact && bytes.is_some()) {

@@ -17,6 +17,8 @@ pub struct Config {
     pub ftd_ratio: Option<NonZeroU64>,
     pub audit_output: Option<PathBuf>,
     pub seed: Option<u64>,
+    pub duplicate_percentage: Option<f64>,
+    pub max_duplicates_per_file: Option<std::num::NonZeroUsize>,
 }
 
 #[derive(thiserror::Error, Debug)]

@@ -30,3 +30,8 @@ ftd_ratio = 250
 
 # PRNG starting seed
 seed = 42
+
+# duplicates (additional to the files specified via files)
+duplicate_percentage = 10
+max_duplicates_per_file = 3
+

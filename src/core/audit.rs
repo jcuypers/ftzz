@@ -24,6 +24,7 @@ pub struct AuditEntry {
     pub hash: Option<String>,
     pub permissions: Option<u32>,
     pub owner: Option<String>,
+    pub is_duplicate: bool,
 }
 
 pub struct AuditTrail {
@@ -38,7 +39,7 @@ impl AuditTrail {
         }
     }
 
-    pub fn add_file(&self, path: PathBuf, size: u64, hash: Option<u64>) {
+    pub fn add_file(&self, path: PathBuf, size: u64, hash: Option<u64>, is_duplicate: bool) {
         let mut entries = self.entries.lock().unwrap();
         entries.push(AuditEntry {
             path,
@@ -47,6 +48,7 @@ impl AuditTrail {
             hash: hash.map(|h| format!("{h:016x}")),
             permissions: None,
             owner: None,
+            is_duplicate,
         });
     }
 
@@ -59,6 +61,7 @@ impl AuditTrail {
             hash: None,
             permissions: None,
             owner: None,
+            is_duplicate: false,
         });
     }
 
@@ -94,7 +97,7 @@ impl AuditTrail {
         let mut wtr = csv::Writer::from_path(path)?;
 
         // Write header
-        wtr.write_record(["path", "type", "size", "hash", "permissions", "owner"])?;
+        wtr.write_record(["path", "type", "size", "hash", "permissions", "owner", "is_duplicate"])?;
 
         for entry in entries.iter() {
             wtr.write_record([
@@ -111,6 +114,7 @@ impl AuditTrail {
                     .unwrap_or_default()
                     .as_str(),
                 entry.owner.as_deref().unwrap_or(""),
+                if entry.is_duplicate { "true" } else { "false" },
             ])?;
         }
         drop(entries);
@@ -129,7 +133,8 @@ impl AuditTrail {
                 size INTEGER NOT NULL,
                 hash TEXT,
                 permissions INTEGER,
-                owner TEXT
+                owner TEXT,
+                is_duplicate BOOLEAN NOT NULL DEFAULT 0
             )",
             [],
         )?;
@@ -137,8 +142,8 @@ impl AuditTrail {
         let tx = conn.transaction()?;
         {
             let mut stmt = tx.prepare(
-                "INSERT INTO audit_entries (path, type, size, hash, permissions, owner)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                "INSERT INTO audit_entries (path, type, size, hash, permissions, owner, is_duplicate)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             )?;
 
             for entry in entries.iter() {
@@ -152,6 +157,7 @@ impl AuditTrail {
                     entry.hash,
                     entry.permissions,
                     entry.owner,
+                    entry.is_duplicate,
                 ])?;
             }
         }
