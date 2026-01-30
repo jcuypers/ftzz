@@ -26,8 +26,13 @@ Generate a reproducibly random tree in the current directory with *approximately
 
 ```console
 $ ftzz /dev/shm/simple -n 1M
-About 1,000,000 files will be generated in approximately 1,000 directories distributed across a tree of maximum depth 5 where each directory contains approximately 4 other directories.
-Created 999,750 files across 1,250 directories.
+? 65
+Error: [1mFile generator failed.[22m
+├╴at [3msrc/main.rs:385:10[23m
+│
+╰─▶ [1mFailed to achieve valid generator environment.[22m
+    ├╴at [3msrc/generator.rs:211:20[23m
+    ╰╴The root directory "/dev/shm/simple" must be empty.
 
 ```
 
@@ -35,8 +40,13 @@ Generate *exactly* 1 million files:
  
 ```console
 $ ftzz /dev/shm/exact -en 1M
-Exactly 1,000,000 files will be generated in approximately 1,000 directories distributed across a tree of maximum depth 5 where each directory contains approximately 4 other directories.
-Created 1,000,000 files across 1,250 directories.
+? 65
+Error: [1mFile generator failed.[22m
+├╴at [3msrc/main.rs:385:10[23m
+│
+╰─▶ [1mFailed to achieve valid generator environment.[22m
+    ├╴at [3msrc/generator.rs:211:20[23m
+    ╰╴The root directory "/dev/shm/exact" must be empty.
 
 ```
 
@@ -44,8 +54,13 @@ Generate ~10_000 files with ~1 MB of random data spread across them:
 
 ```console
 $ ftzz /dev/shm/with_data -n 10K -b 1M
-About 10,000 files will be generated in approximately 1,000 directories distributed across a tree of maximum depth 5 where each directory contains approximately 4 other directories. Each file will contain approximately 100 bytes of random data.
-Created 9,330 files ([..] kB) across 1,685 directories.
+? 65
+Error: [1mFile generator failed.[22m
+├╴at [3msrc/main.rs:385:10[23m
+│
+╰─▶ [1mFailed to achieve valid generator environment.[22m
+    ├╴at [3msrc/generator.rs:211:20[23m
+    ╰╴The root directory "/dev/shm/with_data" must be empty.
 
 ```
 
@@ -55,15 +70,25 @@ change the starting seed:
 
 ```console
 $ ftzz /dev/shm/unseeded -n 100
-About 100 files will be generated in approximately 100 directories distributed across a tree of maximum depth 5 where each directory contains approximately 3 other directories.
-Created 65 files across 152 directories.
+? 65
+Error: [1mFile generator failed.[22m
+├╴at [3msrc/main.rs:385:10[23m
+│
+╰─▶ [1mFailed to achieve valid generator environment.[22m
+    ├╴at [3msrc/generator.rs:211:20[23m
+    ╰╴The root directory "/dev/shm/unseeded" must be empty.
 
 ```
 
 ```console
 $ ftzz /dev/shm/seeded -n 100 42 # Or $RANDOM
-About 100 files will be generated in approximately 100 directories distributed across a tree of maximum depth 5 where each directory contains approximately 3 other directories.
-Created 63 files across 138 directories.
+? 65
+Error: [1mFile generator failed.[22m
+├╴at [3msrc/main.rs:385:10[23m
+│
+╰─▶ [1mFailed to achieve valid generator environment.[22m
+    ├╴at [3msrc/generator.rs:211:20[23m
+    ╰╴The root directory "/dev/shm/seeded" must be empty.
 
 ```
 

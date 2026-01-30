@@ -6,8 +6,9 @@
 
 use std::{cmp::min, io, num::NonZeroU64, sync::Arc};
 
-use rand::RngCore;
+use rand::{RngCore, SeedableRng};
 use rand_distr::Normal;
+use rand_xoshiro::Xoshiro256PlusPlus;
 use tokio::{task, task::JoinHandle};
 
 use crate::{
@@ -67,6 +68,7 @@ pub trait TaskGenerator {
 fn queue(
     params: GeneratorTaskParams<impl FileContentsGenerator + Send + 'static>,
     done: bool,
+    _task_index: u64,
 ) -> QueueResult {
     if !params.file_objs.is_empty() || params.num_dirs > 0 {
         Ok(QueueOutcome {
@@ -117,9 +119,9 @@ pub struct GeneratorBytes {
     pub fill_byte: Option<u8>,
 }
 
-pub struct DynamicGenerator<R> {
+pub struct DynamicGenerator {
     pub num_dirs_distr: Normal<f64>,
-    pub random: R,
+    pub seed: u64,
 
     pub bytes: Option<GeneratorBytes>,
     pub duplicate_percentage: f64,
@@ -127,6 +129,7 @@ pub struct DynamicGenerator<R> {
     pub pending_duplicates: Vec<PendingDuplicate>,
     pub audit_trail: Option<Arc<AuditTrail>>,
     pub permissions: Vec<u32>,
+    pub next_task_index: u64,
 }
 
 fn generate_primary_specs(
@@ -245,7 +248,7 @@ fn add_duplicates_to_specs_and_buffer(
     }
 }
 
-impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> {
+impl TaskGenerator for DynamicGenerator {
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
     fn queue_gen(
         &mut self,
@@ -256,23 +259,31 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
     ) -> QueueResult {
         let Self {
             ref num_dirs_distr,
-            ref mut random,
+            ref seed,
             ref bytes,
             duplicate_percentage,
             max_duplicates_per_file,
             ref audit_trail,
             ref mut pending_duplicates,
             ref permissions,
+            ref mut next_task_index,
         } = *self;
 
-        let num_files = sample_truncated(num_files_distr, random);
-        let num_dirs = dirs_to_gen(num_files, gen_dirs, num_dirs_distr, random);
+        let task_index = *next_task_index;
+        *next_task_index += 1;
 
-        let mut file_specs = generate_primary_specs(num_files, random, permissions);
+        let mut deterministic_rng = Xoshiro256PlusPlus::seed_from_u64(*seed ^ task_index);
+        let mut rng_for_counts = Xoshiro256PlusPlus::seed_from_u64(*seed ^ task_index);
+        let mut rng_for_content =
+            Xoshiro256PlusPlus::seed_from_u64(*seed ^ task_index ^ 0xABCD1234);
 
-        // Use a separate RNG for duplicates to avoid affecting the primary structure
-        // sequence
-        let mut dup_rng = random.clone();
+        let num_files = sample_truncated(num_files_distr, &mut rng_for_counts);
+        let num_dirs = dirs_to_gen(num_files, gen_dirs, num_dirs_distr, &mut rng_for_counts);
+
+        let mut file_specs = generate_primary_specs(num_files, &mut deterministic_rng, permissions);
+
+        // Use a separate deterministic RNG for duplicates
+        let mut dup_rng = Xoshiro256PlusPlus::seed_from_u64(*seed ^ task_index ^ 0xDEADBEEF);
 
         if bytes.is_some() {
             add_duplicates_to_specs_and_buffer(
@@ -305,6 +316,7 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
                     file_offset: 0,
                     file_contents: $file_contents,
                     audit_trail: $audit_trail.clone(),
+                    task_index,
                 }
             }};
         }
@@ -319,17 +331,19 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
                     file_specs,
                     OnTheFlyGeneratedFileContents {
                         num_bytes_distr,
-                        seed: random.next_u64(),
+                        seed: rng_for_content.next_u64(),
                         fill_byte,
                     },
                     audit_trail
                 ),
                 false,
+                task_index,
             )
         } else {
             queue(
                 build_params!(file_specs, NoGeneratedFileContents, audit_trail),
                 false,
+                task_index,
             )
         }
     }
@@ -354,11 +368,17 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
 
         let Self {
             ref mut pending_duplicates,
-            ref mut random,
             ref bytes,
             ref audit_trail,
+            ref mut next_task_index,
+            ref seed,
             ..
         } = *self;
+
+        let task_index = *next_task_index;
+        *next_task_index += 1;
+        let mut rng_for_content =
+            Xoshiro256PlusPlus::seed_from_u64(*seed ^ task_index ^ 0xABCD1234);
 
         while let Some(dup) = pending_duplicates.pop() {
             file_specs.push(dup.spec);
@@ -377,6 +397,7 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
                     file_offset: 0,
                     file_contents: $file_contents,
                     audit_trail: $audit_trail.clone(),
+                    task_index,
                 }
             }};
         }
@@ -391,24 +412,26 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
                     file_specs,
                     OnTheFlyGeneratedFileContents {
                         num_bytes_distr,
-                        seed: random.next_u64(),
+                        seed: rng_for_content.next_u64(),
                         fill_byte,
                     },
                     audit_trail
                 ),
                 true, // done
+                task_index,
             )
         } else {
             queue(
                 build_params!(file_specs, NoGeneratedFileContents, audit_trail),
                 true,
+                task_index,
             )
         }
     }
 }
 
-pub struct StaticGenerator<R> {
-    pub random: R,
+pub struct StaticGenerator {
+    pub seed: u64,
     pub files_exact: Option<u64>,
     pub bytes_exact: Option<u64>,
     pub duplicate_percentage: f64,
@@ -423,27 +446,29 @@ pub struct StaticGenerator<R> {
     pub bytes: Option<GeneratorBytes>,
     pub pending_duplicates: Vec<PendingDuplicate>,
     pub permissions: Vec<u32>,
+    pub next_task_index: u64,
 }
 
-impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
+impl StaticGenerator {
     pub fn new(
-        dynamic: DynamicGenerator<R>,
+        dynamic: DynamicGenerator,
         files_exact: Option<NonZeroU64>,
         bytes_exact: Option<NonZeroU64>,
     ) -> Self {
         let DynamicGenerator {
             num_dirs_distr,
-            random,
+            seed,
             bytes,
             duplicate_percentage,
             max_duplicates_per_file,
             audit_trail,
             pending_duplicates,
             permissions,
+            next_task_index,
         } = dynamic;
         debug_assert!(files_exact.is_some() || bytes_exact.is_some());
         Self {
-            random,
+            seed,
             files_exact: files_exact.map(NonZeroU64::get),
             bytes_exact: bytes_exact.map(NonZeroU64::get),
             duplicate_percentage,
@@ -455,6 +480,7 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
             bytes,
             pending_duplicates,
             permissions,
+            next_task_index,
         }
     }
 
@@ -470,21 +496,7 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
         offset: u64,
         byte_counts_pool: &mut Vec<Vec<u64>>,
     ) -> QueueResult {
-        macro_rules! build_params {
-            ($file_specs:expr, $file_contents:expr, $audit_trail:expr) => {{
-                GeneratorTaskParams {
-                    target_dir: file,
-                    file_objs: $file_specs,
-                    num_dirs,
-                    file_offset: offset,
-                    file_contents: $file_contents,
-                    audit_trail: $audit_trail.clone(),
-                }
-            }};
-        }
-
         let Self {
-            ref mut random,
             files_exact: _,
             ref mut bytes_exact,
             duplicate_percentage,
@@ -496,10 +508,18 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
             bytes: ref bytes_opt,
             ref mut pending_duplicates,
             ref permissions,
+            ref seed,
+            ref mut next_task_index,
         } = *self;
 
-        let mut file_specs = generate_primary_specs(num_files, random, permissions);
-        let mut dup_rng = random.clone();
+        let task_index = *next_task_index;
+        *next_task_index += 1;
+
+        let mut deterministic_rng = Xoshiro256PlusPlus::seed_from_u64(seed ^ task_index);
+        let mut rng_for_content = Xoshiro256PlusPlus::seed_from_u64(seed ^ task_index ^ 0xABCD1234);
+        let mut rng_for_counts = Xoshiro256PlusPlus::seed_from_u64(seed ^ task_index ^ 0x55555555);
+        let mut file_specs = generate_primary_specs(num_files, &mut deterministic_rng, permissions);
+        let mut dup_rng = deterministic_rng;
 
         if let Some(GeneratorBytes {
             num_bytes_distr,
@@ -523,7 +543,10 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                         .0;
 
                     for count in raw_byte_counts {
-                        let num_bytes = min(*bytes, sample_truncated(&num_bytes_distr, random));
+                        let num_bytes = min(
+                            *bytes,
+                            sample_truncated(&num_bytes_distr, &mut rng_for_counts),
+                        );
                         *bytes -= num_bytes;
                         count.write(num_bytes);
                     }
@@ -594,6 +617,20 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                 // from `bytes`. So if we have duplicates in buffer, we should
                 // output them.
 
+                macro_rules! build_params {
+                    ($file_specs:expr, $file_contents:expr, $audit_trail:expr) => {{
+                        GeneratorTaskParams {
+                            target_dir: file,
+                            file_objs: $file_specs,
+                            num_dirs,
+                            file_offset: offset,
+                            file_contents: $file_contents,
+                            audit_trail: $audit_trail.clone(),
+                            task_index,
+                        }
+                    }};
+                }
+
                 if !byte_counts.is_empty() || (num_files > 0 && *bytes > 0) {
                     // Condition to use PreDefined
                     queue(
@@ -601,12 +638,13 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                             file_specs,
                             PreDefinedGeneratedFileContents {
                                 byte_counts,
-                                seed: random.next_u64(),
+                                seed: rng_for_content.next_u64(),
                                 fill_byte,
                             },
                             audit_trail
                         ),
                         done,
+                        task_index,
                     )
                 } else {
                     // Recycled byte_counts since unused
@@ -615,10 +653,25 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                     queue(
                         build_params!(file_specs, NoGeneratedFileContents, audit_trail),
                         done,
+                        task_index,
                     )
                 }
             } else {
                 // OnTheFly Mode (No bytes_exact tracking)
+
+                macro_rules! build_params {
+                    ($file_specs:expr, $file_contents:expr, $audit_trail:expr) => {{
+                        GeneratorTaskParams {
+                            target_dir: file,
+                            file_objs: $file_specs,
+                            num_dirs,
+                            file_offset: offset,
+                            file_contents: $file_contents,
+                            audit_trail: $audit_trail.clone(),
+                            task_index,
+                        }
+                    }};
+                }
 
                 // 2. Generate NEW duplicates
                 if num_files > 0 {
@@ -651,30 +704,46 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                         file_specs,
                         OnTheFlyGeneratedFileContents {
                             num_bytes_distr,
-                            seed: random.next_u64(),
+                            seed: rng_for_content.next_u64(),
                             fill_byte,
                         },
                         audit_trail
                     ),
                     done,
+                    task_index,
                 )
             }
         } else {
             // No bytes configured (0-byte files inferred), so no duplicates logic needed
+            macro_rules! build_params {
+                ($file_specs:expr, $file_contents:expr, $audit_trail:expr) => {{
+                    GeneratorTaskParams {
+                        target_dir: file,
+                        file_objs: $file_specs,
+                        num_dirs,
+                        file_offset: offset,
+                        file_contents: $file_contents,
+                        audit_trail: $audit_trail.clone(),
+                        task_index,
+                    }
+                }};
+            }
+
             queue(
                 build_params!(file_specs, NoGeneratedFileContents, audit_trail),
                 done,
+                task_index,
             )
         }
     }
 }
 
-impl<R: RngCore + Clone + Send + 'static> TaskGenerator for StaticGenerator<R> {
+impl TaskGenerator for StaticGenerator {
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(level = "trace", skip(self, byte_counts_pool))
     )]
-    fn queue_gen(
+        fn queue_gen(
         &mut self,
         num_files_distr: &Normal<f64>,
         file: FastPathBuf,
@@ -682,7 +751,6 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for StaticGenerator<R> {
         byte_counts_pool: &mut Vec<Vec<u64>>,
     ) -> QueueResult {
         let Self {
-            ref mut random,
             ref mut files_exact,
             bytes_exact: _,
             duplicate_percentage: _,
@@ -694,11 +762,17 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for StaticGenerator<R> {
             bytes: _,
             pending_duplicates: _,
             permissions: _,
+            seed: _,
+            ref mut next_task_index,
         } = *self;
+
+        let task_index = *next_task_index;
+        *next_task_index += 1;
 
         debug_assert!(!*done);
 
-        let mut num_files = sample_truncated(num_files_distr, random);
+        let mut rng_for_counts = Xoshiro256PlusPlus::seed_from_u64(self.seed ^ task_index);
+        let mut num_files = sample_truncated(num_files_distr, &mut rng_for_counts);
         if let Some(files) = files_exact {
             if num_files >= *files {
                 *done = true;
@@ -715,7 +789,7 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for StaticGenerator<R> {
         let num_dirs = if *done {
             0
         } else {
-            dirs_to_gen(num_files, gen_dirs, num_dirs_distr, random)
+            dirs_to_gen(num_files, gen_dirs, num_dirs_distr, &mut rng_for_counts)
         };
         self.queue_gen_internal(file, num_files, num_dirs, 0, byte_counts_pool)
     }

@@ -3,7 +3,7 @@ source: tests/generator.rs
 expression: "&golden"
 ---
 Exactly 1,000 files will be generated in approximately 1 directory distributed across a tree of maximum depth 0 where each directory contains approximately 0 other directories. Each file will contain approximately 100 bytes of random data.
-Created 1,000 files (100.3 kB) across 0 directories.
+Created 1,000 files (99.8 kB) across 0 directories.
 
 /0
 /1
@@ -1006,4 +1006,4 @@ Created 1,000 files (100.3 kB) across 0 directories.
 /998
 /999
 
-0x187208c57f5ad8fb
+0xcdfa2fc84116ed03

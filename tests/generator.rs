@@ -12,7 +12,6 @@ use std::{
     path::Path,
 };
 
-use expect_test::expect_file;
 use ftzz::{Generator, NumFilesWithRatio};
 use io_adapters::WriteExtension;
 use more_asserts::assert_le;
@@ -21,7 +20,7 @@ use rstest::rstest;
 
 use crate::inspect::InspectableTempDir;
 
-use insta::{assert_snapshot};
+use insta::assert_snapshot;
 
 mod inspect {
     use std::path::PathBuf;
@@ -82,7 +81,7 @@ fn gen_in_empty_existing_dir_is_allowed() {
     assert_snapshot!(&golden);
 }
 
-#[test] 
+#[test]
 fn gen_in_non_empty_existing_dir_is_disallowed() {
     let dir = InspectableTempDir::new();
     let mut golden = String::new();
@@ -107,7 +106,6 @@ fn gen_in_non_empty_existing_dir_is_disallowed() {
 
     assert_snapshot!(&golden);
 }
-
 
 #[test]
 fn gen_creates_new_dir_if_not_present() {
@@ -198,7 +196,8 @@ fn advanced_create_files(
     }
     print_and_hash_dir(&dir.path, &mut golden);
 
-    set_snapshot_suffix!("{}{}{}_{}_{}_{}", 
+    set_snapshot_suffix!(
+        "{}{}{}_{}_{}_{}",
         if files_exact { "_exact" } else { "" },
         if bytes.0 > 0 {
             format!("_bytes_{}", bytes.0)
@@ -208,7 +207,7 @@ fn advanced_create_files(
         if bytes.1 { "_exact" } else { "" },
         num_files,
         max_depth,
-        ftd_ratio 
+        ftd_ratio
     );
     assert_snapshot!(&golden);
 }
@@ -238,10 +237,13 @@ fn max_depth_is_respected(#[case] max_depth: u32) {
     assert_le!(find_max_depth(&dir.path), max_depth);
     print_and_hash_dir(&dir.path, &mut golden);
 
-    expect_file![format!(
-        "../testdata/generator/max_depth_is_respected_{max_depth}.stdout"
-    )]
-    .assert_eq(&golden);
+    //expect_file![format!(
+    //    "../testdata/generator/max_depth_is_respected_{max_depth}.stdout"
+    //)]
+    //.assert_eq(&golden);
+
+    set_snapshot_suffix!("{}", max_depth);
+    assert_snapshot!(&golden);
 }
 
 #[rstest]
@@ -284,10 +286,8 @@ fn fill_byte_is_respected(#[case] fill_byte: u8) {
     assert_fill_byte();
     print_and_hash_dir(&dir.path, &mut golden);
 
-    expect_file![format!(
-        "../testdata/generator/fill_byte_is_respected_{fill_byte}.stdout"
-    )]
-    .assert_eq(&golden);
+    set_snapshot_suffix!("{}", fill_byte);
+    assert_snapshot!(&golden);
 }
 
 #[test]

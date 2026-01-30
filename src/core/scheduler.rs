@@ -1,7 +1,7 @@
 use std::{
     cmp::max,
     collections::VecDeque,
-    io, mem,
+    io,
     num::{NonZeroU64, NonZeroUsize},
     ops::AddAssign,
     path::PathBuf,
@@ -224,15 +224,7 @@ async fn flush_tasks(
 
     let mut drain = tasks.len() / 2;
     while drain > 0 {
-        let task = {
-            let mut task = tasks.pop_front().unwrap();
-            if !task.is_finished()
-                && let Some(h) = tasks.iter_mut().find(|h| h.is_finished())
-            {
-                mem::swap(&mut task, h);
-            }
-            task
-        };
+        let task = tasks.pop_front().unwrap();
 
         #[cfg(not(feature = "dry_run"))]
         let outcome = handle_task_result(task.await, stats)?;

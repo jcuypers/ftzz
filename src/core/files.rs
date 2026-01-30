@@ -14,6 +14,8 @@ pub struct GeneratorTaskParams<G: FileContentsGenerator> {
     pub file_offset: u64,
     pub file_contents: G,
     pub audit_trail: Option<Arc<AuditTrail>>,
+    #[allow(dead_code)]
+    pub task_index: u64,
 }
 
 pub struct GeneratorTaskOutcome {
@@ -37,6 +39,7 @@ pub fn create_files_and_dirs(
         file_offset,
         mut file_contents,
         audit_trail,
+        task_index: _,
     }: GeneratorTaskParams<impl FileContentsGenerator>,
 ) -> Result<GeneratorTaskOutcome, io::Error> {
     let num_files = file_objs.len() as u64;

@@ -146,11 +146,6 @@ impl FileContentsGenerator for OnTheFlyGeneratedFileContents {
         let num_bytes = sample_truncated(num_bytes_distr, &mut file_rnd);
         if num_bytes > 0 || retryable {
             File::create(&*file).and_then(|f| {
-                let num_bytes = if retryable {
-                    sample_truncated(num_bytes_distr, &mut file_rnd)
-                } else {
-                    num_bytes
-                };
                 let hash = write_bytes(f, num_bytes, (fill_byte, &mut file_rnd), hash_seed)?;
                 #[cfg(unix)]
                 if let Some(p) = spec.permission {

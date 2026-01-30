@@ -21,8 +21,6 @@ use bon::Builder;
 use bytesize::ByteSize;
 use error_stack::{Report, Result, ResultExt};
 use log::{Level, log};
-use rand::SeedableRng;
-use rand_xoshiro::Xoshiro256PlusPlus;
 use thiserror::Error;
 use thousands::Separable;
 
@@ -476,7 +474,7 @@ async fn run_generator_async(
     let bytes = NonZeroU64::new(bytes);
     let dynamic = DynamicGenerator {
         num_dirs_distr: truncatable_normal(dirs_per_dir),
-        random: Xoshiro256PlusPlus::seed_from_u64(seed),
+        seed,
 
         bytes: bytes.map(|_| GeneratorBytes {
             num_bytes_distr: truncatable_normal(bytes_per_file),
@@ -487,6 +485,7 @@ async fn run_generator_async(
         audit_trail,
         permissions,
         pending_duplicates: Vec::new(),
+        next_task_index: 0,
     };
 
     if files_exact || (bytes_exact && bytes.is_some()) {
