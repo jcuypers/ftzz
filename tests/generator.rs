@@ -124,8 +124,6 @@ fn gen_creates_new_dir_if_not_present() {
     assert!(dir.path.join("new").exists());
     print_and_hash_dir(&dir.path, &mut golden);
 
-    //expect_file!["../testdata/generator/gen_creates_new_dir_if_not_present.stdout"]
-    //    .assert_eq(&golden);
     assert_snapshot!(&golden);
 }
 
@@ -218,7 +216,6 @@ fn advanced_create_files(
 #[case(2)]
 #[case(10)]
 #[case(50)]
-#[ignore]
 #[cfg_attr(miri, ignore)] // Miri is way too slow unfortunately
 fn max_depth_is_respected(#[case] max_depth: u32) {
     let dir = InspectableTempDir::new();
@@ -237,11 +234,6 @@ fn max_depth_is_respected(#[case] max_depth: u32) {
     assert_le!(find_max_depth(&dir.path), max_depth);
     print_and_hash_dir(&dir.path, &mut golden);
 
-    //expect_file![format!(
-    //    "../testdata/generator/max_depth_is_respected_{max_depth}.stdout"
-    //)]
-    //.assert_eq(&golden);
-
     set_snapshot_suffix!("{}", max_depth);
     assert_snapshot!(&golden);
 }
@@ -250,7 +242,6 @@ fn max_depth_is_respected(#[case] max_depth: u32) {
 #[case(0)]
 #[case(42)]
 #[case(69)]
-#[ignore]
 #[cfg_attr(miri, ignore)] // Miri is way too slow unfortunately
 fn fill_byte_is_respected(#[case] fill_byte: u8) {
     let dir = InspectableTempDir::new();
@@ -291,7 +282,6 @@ fn fill_byte_is_respected(#[case] fill_byte: u8) {
 }
 
 #[test]
-#[ignore]
 #[cfg_attr(miri, ignore)] // Miri is way too slow unfortunately
 fn fuzz_test() {
     let dir = InspectableTempDir::new();
