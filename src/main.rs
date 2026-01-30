@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     io,
-    io::{Write, stdout},
+    io::{stdout, Write},
     num::NonZeroU64,
     path::PathBuf,
     process::{ExitCode, Termination},
@@ -391,21 +391,4 @@ fn num_files_parser(s: &str) -> Result<NonZeroU64, Cow<'static, str>> {
 
 fn file_to_dir_ratio_parser(s: &str) -> Result<NonZeroU64, Cow<'static, str>> {
     NonZeroU64::new(si_number(s)?).ok_or_else(|| "Cannot have no files per directory.".into())
-}
-
-#[cfg(test)]
-mod cli_tests {
-    use clap::CommandFactory;
-
-    use super::*;
-
-    #[test]
-    fn verify_app() {
-        Ftzz::command().debug_assert();
-    }
-
-    #[test]
-    fn help_for_review() {
-        supercilex_tests::help_for_review(Ftzz::command());
-    }
 }

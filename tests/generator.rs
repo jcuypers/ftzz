@@ -9,6 +9,7 @@ use std::{
     io,
     io::{BufReader, Read, stdout},
     num::NonZeroU64,
+    num::NonZeroUsize,
     path::Path,
 };
 
@@ -17,6 +18,7 @@ use io_adapters::WriteExtension;
 use more_asserts::assert_le;
 use rand::Rng;
 use rstest::rstest;
+use toml::value::Array;
 
 use crate::inspect::InspectableTempDir;
 
@@ -150,6 +152,136 @@ fn simple_create_files(#[case] num_files: u64) {
     assert_snapshot!(&golden);
 }
 
+
+#[rstest]
+#[case(1_000)]
+#[cfg_attr(not(miri), case(10_000))]
+#[cfg_attr(not(miri), case(100_000))]
+fn simple_duplicate_files(
+    #[case] num_files: u64,
+    #[values(0.0, 5.0)] duplicate_percentage: f64,
+    //#[values(NonZeroUsize::new(1).unwrap(),NonZeroUsize::new(2).unwrap())] max_duplicates_per_file: NonZeroUsize
+) {
+
+    let dir = InspectableTempDir::new();
+    let mut golden = String::new();
+
+    Generator::builder()
+        .root_dir(dir.path.clone())
+        .num_files_with_ratio(NumFilesWithRatio::from_num_files(
+            NonZeroU64::new(num_files).unwrap(),
+        ))
+        .duplicate_percentage(duplicate_percentage)
+        //.max_duplicates_per_file(max_duplicates_per_file)
+        .build()
+        .generate(&mut golden)
+        .unwrap();
+
+    print_and_hash_dir(&dir.path, &mut golden);
+
+    set_snapshot_suffix!("{}_{}", num_files, duplicate_percentage);
+    assert_snapshot!(&golden);
+}
+
+#[rstest]
+#[case(1_000)]
+#[cfg_attr(not(miri), case(10_000))]
+#[cfg_attr(not(miri), case(100_000))]
+fn simple_permissions(
+    #[case] num_files: u64,
+    #[values(
+        vec![600,700],
+        vec![666,777],
+    )] perm: Vec<u32>
+    //#[values(NonZeroUsize::new(1).unwrap(),NonZeroUsize::new(2).unwrap())] max_duplicates_per_file: NonZeroUsize
+) {
+
+    let dir = InspectableTempDir::new();
+    let mut golden = String::new();
+
+    Generator::builder()
+        .root_dir(dir.path.clone())
+        .num_files_with_ratio(NumFilesWithRatio::from_num_files(
+            NonZeroU64::new(num_files).unwrap(),
+        ))
+        .permissions(perm.clone())
+        .build()
+        .generate(&mut golden)
+        .unwrap();
+
+    print_and_hash_dir(&dir.path, &mut golden);
+
+    //set_snapshot_suffix!("{}_{}", num_files, perm.join("-"));
+    set_snapshot_suffix!("{}_{}", num_files, perm.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("-"));
+    assert_snapshot!(&golden);
+}
+
+#[rstest]
+fn duplicate_create_files(
+    #[values(1, 1_000, 10_000)] num_files: u64,
+    #[values((0, false), (1_000, false), (1_000, true), (100_000, false), (100_000, true))] bytes: (
+        u64,
+        bool,
+    ),
+    #[values(0, 1, 10)] max_depth: u32,
+    #[values(1, 100, 1_000)] ftd_ratio: u64,
+    #[values(false, true)] files_exact: bool,
+ //   #[values(0.0, 5.0)] duplicate_percentage: f64,
+) {
+    #[cfg(miri)]
+    if num_files > 100 || bytes.0 > 10_000 {
+        return;
+    }
+
+    let dir = InspectableTempDir::new();
+    let mut golden = String::new();
+
+    Generator::builder()
+        .root_dir(dir.path.clone())
+        .num_files_with_ratio(
+            NumFilesWithRatio::new(
+                NonZeroU64::new(num_files).unwrap(),
+                NonZeroU64::new(min(num_files, ftd_ratio)).unwrap(),
+            )
+            .unwrap(),
+        )
+        .num_bytes(bytes.0)
+        .files_exact(files_exact)
+        .bytes_exact(bytes.1)
+        .max_depth(max_depth)
+   //     .duplicate_percentage(duplicate_percentage)
+        .build()
+        .generate(&mut golden)
+        .unwrap();
+
+    if files_exact {
+        assert_eq!(count_num_files(&dir.path), num_files);
+    }
+    if bytes.1 {
+        assert_eq!(count_num_bytes(&dir.path), bytes.0);
+    }
+    print_and_hash_dir(&dir.path, &mut golden);
+
+    set_snapshot_suffix!(
+        "{}{}{}_{}_{}_{}",
+        if files_exact { "_exact" } else { "" },
+        if bytes.0 > 0 {
+            format!("_bytes_{}", bytes.0)
+        } else {
+            String::new()
+        },
+        if bytes.1 { "_exact" } else { "" },
+        num_files,
+        max_depth,
+        ftd_ratio
+     //   if duplicate_percentage > 0.0 { format!("_dup_{}", duplicate_percentage) } else { String::new() }
+        //duplicate_percentage
+    );
+    assert_snapshot!(&golden);
+}
+
+
+
 #[rstest]
 fn advanced_create_files(
     #[values(1, 1_000, 10_000)] num_files: u64,
@@ -234,6 +366,11 @@ fn max_depth_is_respected(#[case] max_depth: u32) {
     assert_le!(find_max_depth(&dir.path), max_depth);
     print_and_hash_dir(&dir.path, &mut golden);
 
+    //expect_file![format!(
+    //    "../testdata/generator/max_depth_is_respected_{max_depth}.stdout"
+    //)]
+    //.assert_eq(&golden);
+
     set_snapshot_suffix!("{}", max_depth);
     assert_snapshot!(&golden);
 }
@@ -242,6 +379,7 @@ fn max_depth_is_respected(#[case] max_depth: u32) {
 #[case(0)]
 #[case(42)]
 #[case(69)]
+//#[ignore]
 #[cfg_attr(miri, ignore)] // Miri is way too slow unfortunately
 fn fill_byte_is_respected(#[case] fill_byte: u8) {
     let dir = InspectableTempDir::new();
@@ -282,6 +420,7 @@ fn fill_byte_is_respected(#[case] fill_byte: u8) {
 }
 
 #[test]
+//#[ignore]
 #[cfg_attr(miri, ignore)] // Miri is way too slow unfortunately
 fn fuzz_test() {
     let dir = InspectableTempDir::new();
