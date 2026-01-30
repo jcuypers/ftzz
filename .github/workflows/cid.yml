@@ -64,14 +64,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Rust
-        run: |
-          rustup target add ${{ matrix.target }}
-          rustup component add rust-src
+        run: rustup target add ${{ matrix.target }}
       - name: Install cross
         if: contains(matrix.tool, 'cross')
         run: cargo install cross
       - name: Build binary
-        run: ${{ matrix.tool }} build --workspace --release --locked --target=${{ matrix.target }} -Z build-std=std
+        run: ${{ matrix.tool }} build --workspace --release --locked --target=${{ matrix.target }}
       - name: Upload binary
         if: matrix.os != 'windows-latest'
         uses: svenstaro/upload-release-action@v2
@@ -80,11 +78,4 @@ jobs:
           file: target/${{ matrix.target }}/release/ftzz
           asset_name: ${{ matrix.target }}-ftzz
           tag: ${{ github.ref }}
-      - name: Upload binary
-        if: matrix.os == 'windows-latest'
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/${{ matrix.target }}/release/ftzz.exe
-          asset_name: ${{ matrix.target }}-ftzz.exe
-          tag: ${{ github.ref }}
+
