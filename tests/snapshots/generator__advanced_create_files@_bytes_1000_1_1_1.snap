@@ -1,0 +1,12 @@
+---
+source: tests/generator.rs
+expression: "&golden"
+---
+About 1 file will be generated in approximately 1 directory distributed across a tree of maximum depth 1 where each directory contains approximately 1 other directory. Each file will contain approximately 1,000 bytes of random data.
+Created 1 file (444 B) across 2 directories.
+
+/0
+/0.dir
+/1.dir
+
+0x28872d880654fa2a

@@ -132,7 +132,8 @@ struct Generate {
     #[arg(help = "Change the PRNG's starting seed [default: 0]")]
     seed: Option<u64>,
 
-    /// Percentage of additional duplicate files to generate (relative to the number of files)
+    /// Percentage of additional duplicate files to generate (relative to the
+    /// number of files)
     #[arg(long = "duplicate-percentage", value_name = "PERCENTAGE")]
     duplicate_percentage: Option<f64>,
 
@@ -174,7 +175,7 @@ impl Generate {
             self.seed = config.seed;
         }
         if self.audit_output.is_none() {
-            self.audit_output = config.audit_output.clone();
+            self.audit_output.clone_from(&config.audit_output);
         }
         if self.duplicate_percentage.is_none() {
             self.duplicate_percentage = config.duplicate_percentage;
@@ -183,7 +184,7 @@ impl Generate {
             self.max_duplicates_per_file = config.max_duplicates_per_file;
         }
         if self.permissions.is_none() {
-            self.permissions = config.permissions.clone();
+            self.permissions.clone_from(&config.permissions);
         }
     }
 }
@@ -239,7 +240,10 @@ impl TryFrom<Generate> for Generator {
             permissions
                 .unwrap_or_default()
                 .into_iter()
-                .map(|p| u32::from_str_radix(&p, 8).map_err(|_| Cow::from(format!("Invalid octal permission: {p}"))))
+                .map(|p| {
+                    u32::from_str_radix(&p, 8)
+                        .map_err(|_| Cow::from(format!("Invalid octal permission: {p}")))
+                })
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|_| NumFilesWithRatioError::InvalidRatio {
                     num_files: NonZeroU64::new(1).unwrap(),
@@ -270,6 +274,7 @@ mod generate_tests {
             audit_output: None,
             duplicate_percentage: None,
             max_duplicates_per_file: None,
+            permissions: None,
         };
 
         let generator = Generator::try_from(options).unwrap();

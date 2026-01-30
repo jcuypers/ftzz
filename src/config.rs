@@ -1,10 +1,14 @@
-use std::{fs, num::NonZeroU64, path::{Path, PathBuf}};
+use std::{
+    fs,
+    num::NonZeroU64,
+    path::{Path, PathBuf},
+};
 
 use error_stack::{Result, ResultExt};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Default, Clone)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     pub files: Option<NonZeroU64>,

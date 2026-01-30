@@ -27,6 +27,7 @@ pub struct AuditEntry {
     pub is_duplicate: bool,
 }
 
+#[derive(Debug)]
 pub struct AuditTrail {
     entries: Mutex<Vec<AuditEntry>>,
 }
@@ -104,7 +105,15 @@ impl AuditTrail {
         let mut wtr = csv::Writer::from_path(path)?;
 
         // Write header
-        wtr.write_record(["path", "type", "size", "hash", "permissions", "owner", "is_duplicate"])?;
+        wtr.write_record([
+            "path",
+            "type",
+            "size",
+            "hash",
+            "permissions",
+            "owner",
+            "is_duplicate",
+        ])?;
 
         for entry in entries.iter() {
             wtr.write_record([
@@ -149,7 +158,8 @@ impl AuditTrail {
         let tx = conn.transaction()?;
         {
             let mut stmt = tx.prepare(
-                "INSERT INTO audit_entries (path, type, size, hash, permissions, owner, is_duplicate)
+                "INSERT INTO audit_entries (path, type, size, hash, permissions, owner, \
+                 is_duplicate)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             )?;
 

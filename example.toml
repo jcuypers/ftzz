@@ -2,7 +2,7 @@
 # All fields are optional
 
 # The number of files to generate
-files = 100000
+files = 10000000
 
 # Write an audit log of all generated files to this path
 audit_output = "audit.db"
@@ -11,7 +11,7 @@ audit_output = "audit.db"
 files_exact = true
 
 # Total amount of random data in bytes
-total_bytes = 1000000000
+total_bytes = 10000000000 
 
 # Specific fill byte (0-255)
 # fill_byte = 0
@@ -23,17 +23,17 @@ bytes_exact = false
 exact = true
 
 # Maximum directory tree depth
-max_depth = 5
+max_depth = 1
 
 # Number of files per directory
-ftd_ratio = 250
+ftd_ratio = 10000000
 
 # PRNG starting seed
 seed = 42
 
 # duplicates (additional to the files specified via files)
-duplicate_percentage = 10
+duplicate_percentage = 5
 max_duplicates_per_file = 3
 
-permissions = ["644", "700"]
+permissions = ["400","404","440","444","600","600","640","644","664","666","700","770","777"]
 

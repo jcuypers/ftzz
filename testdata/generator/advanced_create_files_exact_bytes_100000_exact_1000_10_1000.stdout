@@ -1,5 +1,5 @@
 Exactly 1,000 files will be generated in approximately 1 directory distributed across a tree of maximum depth 10 where each directory contains approximately 1 other directory. Each file will contain approximately 100 bytes of random data totaling exactly 100000 bytes.
-Created 1,000 files (100.0 kB) across 4 directories.
+Created 1,000 files (100.0 kB) across 1 directory.
 
 /0
 /0.dir
@@ -857,9 +857,7 @@ Created 1,000 files (100.0 kB) across 4 directories.
 /98
 /99
 /0.dir/0
-/0.dir/0.dir
 /0.dir/1
-/0.dir/1.dir
 /0.dir/10
 /0.dir/100
 /0.dir/101
@@ -879,9 +877,38 @@ Created 1,000 files (100.0 kB) across 4 directories.
 /0.dir/114
 /0.dir/115
 /0.dir/116
+/0.dir/117
+/0.dir/118
+/0.dir/119
 /0.dir/12
+/0.dir/120
+/0.dir/121
+/0.dir/122
+/0.dir/123
+/0.dir/124
+/0.dir/125
+/0.dir/126
+/0.dir/127
+/0.dir/128
+/0.dir/129
 /0.dir/13
+/0.dir/130
+/0.dir/131
+/0.dir/132
+/0.dir/133
+/0.dir/134
+/0.dir/135
+/0.dir/136
+/0.dir/137
+/0.dir/138
+/0.dir/139
 /0.dir/14
+/0.dir/140
+/0.dir/141
+/0.dir/142
+/0.dir/143
+/0.dir/144
+/0.dir/145
 /0.dir/15
 /0.dir/16
 /0.dir/17
@@ -975,35 +1002,5 @@ Created 1,000 files (100.0 kB) across 4 directories.
 /0.dir/97
 /0.dir/98
 /0.dir/99
-/0.dir/0.dir/0
-/0.dir/0.dir/0.dir
-/0.dir/0.dir/1
-/0.dir/0.dir/10
-/0.dir/0.dir/11
-/0.dir/0.dir/12
-/0.dir/0.dir/13
-/0.dir/0.dir/14
-/0.dir/0.dir/15
-/0.dir/0.dir/16
-/0.dir/0.dir/17
-/0.dir/0.dir/18
-/0.dir/0.dir/19
-/0.dir/0.dir/2
-/0.dir/0.dir/20
-/0.dir/0.dir/21
-/0.dir/0.dir/22
-/0.dir/0.dir/23
-/0.dir/0.dir/24
-/0.dir/0.dir/25
-/0.dir/0.dir/3
-/0.dir/0.dir/4
-/0.dir/0.dir/5
-/0.dir/0.dir/6
-/0.dir/0.dir/7
-/0.dir/0.dir/8
-/0.dir/0.dir/9
-/0.dir/1.dir/0
-/0.dir/1.dir/1
-/0.dir/1.dir/2
 
-0x749a345848d34e7b
+0xba65aec184fa8ad8

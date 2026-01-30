@@ -11,13 +11,16 @@ named `n` and directories are named `n.dir` for a given natural number `n`.
 By default, generated files are empty, but random data can be used as the file contents with the
 `total-bytes` option.
 
-Usage: ftzz [OPTIONS] <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR> [SEED]
 
 Arguments:
   <ROOT_DIR>
           The directory in which to generate files
           
           The directory will be created if it does not exist.
+
+  [SEED]
+          Change the PRNG's starting seed [default: 0]
 
 Options:
   -n, --files <NUM_FILES>
@@ -55,16 +58,20 @@ Options:
           Note: this value is probabilistically respected, meaning not all directories will have N
           files).
 
-      --seed <SEED>
-          Change the PRNG's starting seed
-          
-          For example, you can use bash's `$RANDOM` function.
+  -a, --audit-output <AUDIT_OUTPUT>
+          Write an audit log of all generated files to this path
+
+      --duplicate-percentage <PERCENTAGE>
+          Percentage of additional duplicate files to generate (relative to the number of files)
+
+      --max-duplicates-per-file <MAX>
+          Maximum number of duplicates per file
+
+      --permissions <OCTAL>
+          List of file permission octals to deterministically select from
 
       --config <CONFIG_FILE>
           Path to a TOML configuration file
-
-  -a, --audit-output <AUDIT_OUTPUT>
-          Write an audit log of all generated files to this path
 
   -h, --help
           Print help (use `-h` for a summary)

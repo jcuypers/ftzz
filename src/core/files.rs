@@ -3,10 +3,9 @@ use std::{fs::create_dir_all, io, io::ErrorKind::NotFound, sync::Arc};
 use error_stack::{Report, Result, ResultExt};
 
 use crate::{
+    core::{FileSpec, audit::AuditTrail, file_contents::FileContentsGenerator},
     utils::{FastPathBuf, with_dir_name, with_file_name},
 };
-
-use crate::core::{FileSpec, audit::AuditTrail, file_contents::FileContentsGenerator};
 
 pub struct GeneratorTaskParams<G: FileContentsGenerator> {
     pub target_dir: FastPathBuf,
@@ -43,7 +42,7 @@ pub fn create_files_and_dirs(
     let num_files = file_objs.len() as u64;
     create_dirs(num_dirs, &mut target_dir, audit_trail.as_deref())?;
     create_files(
-        file_objs,
+        &file_objs,
         file_offset,
         &mut target_dir,
         &mut file_contents,
@@ -89,7 +88,7 @@ fn create_dirs(
     tracing::instrument(level = "trace", skip(contents, audit_trail))
 )]
 fn create_files(
-    file_objs: Vec<FileSpec>,
+    file_objs: &[FileSpec],
     offset: u64,
     file: &mut FastPathBuf,
     contents: &mut impl FileContentsGenerator,
@@ -101,8 +100,9 @@ fn create_files(
     let hash_seed = audit_trail.is_some().then_some(0); // Using 0 as default seed for xxhash
 
     let mut start_file = 0;
-    
-    // We only try to create the parent dir for the first file if there are any files.
+
+    // We only try to create the parent dir for the first file if there are any
+    // files.
     if let Some(first_spec) = file_objs.first() {
         let mut guard = with_file_name(offset, |s| file.push(s));
 
@@ -144,14 +144,7 @@ fn create_files(
         let mut file = with_file_name((i as u64) + offset, |s| file.push(s));
 
         let (bytes, hash) = contents
-            .create_file(
-                &mut file,
-                i.try_into().unwrap_or(usize::MAX),
-                false,
-                &mut state,
-                hash_seed,
-                spec,
-            )
+            .create_file(&mut file, i, false, &mut state, hash_seed, spec)
             .attach_printable_lazy(|| format!("Failed to create file {file:?}"))?;
 
         bytes_written += bytes;

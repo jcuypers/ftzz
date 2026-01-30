@@ -30,7 +30,10 @@ fn test_audit_trail_csv() {
     assert!(lines.len() > 1);
 
     // Verify header
-    assert_eq!(lines[0], "path,type,size,hash,permissions,owner");
+    assert_eq!(
+        lines[0],
+        "path,type,size,hash,permissions,owner,is_duplicate"
+    );
 
     // Verify at least some entries exist
     assert!(lines.iter().any(|line| line.contains(",file,")));

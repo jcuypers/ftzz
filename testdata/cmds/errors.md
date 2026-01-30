@@ -5,29 +5,47 @@ $ ftzz
 ? 2
 Generate a random directory hierarchy with some number of files
 
-Usage: ftzz [OPTIONS] <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR> [SEED]
 
 Arguments:
   <ROOT_DIR>  The directory in which to generate files
+  [SEED]      Change the PRNG's starting seed [default: 0]
 
 Options:
-  -n, --files <NUM_FILES>              The number of files to generate
-      --files-exact                    Whether or not to generate exactly N files
-  -b, --total-bytes <NUM_BYTES>        The total amount of random data [default: 0]
-      --fill-byte <FILL_BYTE>          Specify a specific fill byte to be used instead of
-                                       deterministically random data
-      --bytes-exact                    Whether or not to generate exactly N bytes
-  -e, --exact                          Whether or not to generate exactly N files and bytes
-  -d, --max-depth <MAX_DEPTH>          The maximum directory tree depth [default: 5]
-  -r, --ftd-ratio <FILE_TO_DIR_RATIO>  The number of files to generate per directory (default: files
-                                       / 1000)
-      --seed <SEED>                    Change the PRNG's starting seed [default: 0]
-  -a, --audit-output <AUDIT_OUTPUT>     Write an audit log of all generated files to this path
-      --config <CONFIG_FILE>           Path to a TOML configuration file
-  -h, --help                           Print help (use `--help` for more detail)
-  -q, --quiet...                       Decrease logging verbosity
-  -v, --verbose...                     Increase logging verbosity
-  -V, --version                        Print version
+  -n, --files <NUM_FILES>
+          The number of files to generate
+      --files-exact
+          Whether or not to generate exactly N files
+  -b, --total-bytes <NUM_BYTES>
+          The total amount of random data [default: 0]
+      --fill-byte <FILL_BYTE>
+          Specify a specific fill byte to be used instead of deterministically random data
+      --bytes-exact
+          Whether or not to generate exactly N bytes
+  -e, --exact
+          Whether or not to generate exactly N files and bytes
+  -d, --max-depth <MAX_DEPTH>
+          The maximum directory tree depth [default: 5]
+  -r, --ftd-ratio <FILE_TO_DIR_RATIO>
+          The number of files to generate per directory (default: files / 1000)
+  -a, --audit-output <AUDIT_OUTPUT>
+          Write an audit log of all generated files to this path
+      --duplicate-percentage <PERCENTAGE>
+          Percentage of additional duplicate files to generate (relative to the number of files)
+      --max-duplicates-per-file <MAX>
+          Maximum number of duplicates per file
+      --permissions <OCTAL>
+          List of file permission octals to deterministically select from
+      --config <CONFIG_FILE>
+          Path to a TOML configuration file
+  -h, --help
+          Print help (use `--help` for more detail)
+  -q, --quiet...
+          Decrease logging verbosity
+  -v, --verbose...
+          Increase logging verbosity
+  -V, --version
+          Print version
 
 ```
 
@@ -40,7 +58,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz [OPTIONS] <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
@@ -50,7 +68,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz [OPTIONS] <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
@@ -71,7 +89,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz [OPTIONS] <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
@@ -81,7 +99,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz [OPTIONS] <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
@@ -96,7 +114,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz [OPTIONS] <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
@@ -106,7 +124,7 @@ error: unexpected argument '-1' found
 
   tip: to pass '-1' as a value, use '-- -1'
 
-Usage: ftzz [OPTIONS] <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
@@ -123,21 +141,21 @@ Negative seed:
 ```console
 $ ftzz -n 1 dir --seed -1
 ? 2
-error: unexpected argument '-1' found
+error: unexpected argument '--seed' found
 
-  tip: to pass '-1' as a value, use '-- -1'
+  tip: to pass '--seed' as a value, use '-- --seed'
 
-Usage: ftzz [OPTIONS] <ROOT_DIR>
+Usage: ftzz --files <NUM_FILES> <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
 $ ftzz -n 1 dir --seed "-1"
 ? 2
-error: unexpected argument '-1' found
+error: unexpected argument '--seed' found
 
-  tip: to pass '-1' as a value, use '-- -1'
+  tip: to pass '--seed' as a value, use '-- --seed'
 
-Usage: ftzz [OPTIONS] <ROOT_DIR>
+Usage: ftzz --files <NUM_FILES> <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
@@ -150,7 +168,7 @@ $ ftzz -n 1 dir --files-exact --exact
 ? 2
 error: the argument '--files-exact' cannot be used with '--exact'
 
-Usage: ftzz[EXE] --files <NUM_FILES> --files-exact <ROOT_DIR>
+Usage: ftzz --files <NUM_FILES> --files-exact <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
@@ -163,7 +181,7 @@ $ ftzz -n 1 dir --bytes-exact --exact
 ? 2
 error: the argument '--bytes-exact' cannot be used with '--exact'
 
-Usage: ftzz[EXE] --files <NUM_FILES> --bytes-exact <--total-bytes <NUM_BYTES>> <ROOT_DIR>
+Usage: ftzz --files <NUM_FILES> --bytes-exact <--total-bytes <NUM_BYTES>> <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
@@ -177,7 +195,7 @@ $ ftzz -n 1 dir --bytes-exact
 error: the following required arguments were not provided:
   <--total-bytes <NUM_BYTES>>
 
-Usage: ftzz[EXE] --files <NUM_FILES> --bytes-exact <--total-bytes <NUM_BYTES>> <ROOT_DIR>
+Usage: ftzz --files <NUM_FILES> --bytes-exact <--total-bytes <NUM_BYTES>> <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 
@@ -191,7 +209,7 @@ $ ftzz -n 1 dir --fill-byte 42
 error: the following required arguments were not provided:
   <--total-bytes <NUM_BYTES>>
 
-Usage: ftzz[EXE] --files <NUM_FILES> --fill-byte <FILL_BYTE> <--total-bytes <NUM_BYTES>> <ROOT_DIR>
+Usage: ftzz --files <NUM_FILES> --fill-byte <FILL_BYTE> <--total-bytes <NUM_BYTES>> <ROOT_DIR> [SEED]
 
 For more information, try '--help'.
 

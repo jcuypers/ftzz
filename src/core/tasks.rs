@@ -1,4 +1,8 @@
-#![allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+#![allow(
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss
+)]
 
 use std::{cmp::min, io, num::NonZeroU64, sync::Arc};
 
@@ -8,13 +12,14 @@ use tokio::{task, task::JoinHandle};
 
 use crate::{
     core::{
+        FileSpec, PendingDuplicate,
         audit::AuditTrail,
         file_contents::{
             FileContentsGenerator, NoGeneratedFileContents, OnTheFlyGeneratedFileContents,
             PreDefinedGeneratedFileContents,
         },
         files::{GeneratorTaskOutcome, GeneratorTaskParams, create_files_and_dirs},
-        sample_truncated, FileSpec, PendingDuplicate,
+        sample_truncated,
     },
     utils::FastPathBuf,
 };
@@ -78,7 +83,7 @@ fn queue(
                     files_generated: params.file_objs.len() as u64,
                     dirs_generated: params.num_dirs,
                     bytes_generated: 0,
-                    
+
                     pool_return_file: params.target_dir,
                     pool_return_byte_counts: None,
                 }
@@ -165,40 +170,40 @@ fn add_duplicates_to_specs_and_buffer(
     // Min extra copies = 1 (since max >= 2)
     // Max extra copies = max_duplicates_per_file - 1
     // Average extra = (1 + (max - 1)) / 2 = max / 2
-    
+
     let max_dups = max_duplicates_per_file.get();
     if max_dups < 2 {
         return;
     }
-    
+
     let avg_extra = max_dups as f64 / 2.0;
     let prob = (duplicate_percentage / 100.0) / avg_extra;
     // Probability cannot be > 1.0 (if percentage is high and max dups is low)
     // If percentage is 200%, and max dups is 2 (avg 1), prob = 2.0.
-    // In that case we need multiple "duplication events" or ensure every file is duplicated.
-    // Simpler: iterate primary files, check prob.
-    
+    // In that case we need multiple "duplication events" or ensure every file is
+    // duplicated. Simpler: iterate primary files, check prob.
+
     for i in 0..(num_files as usize) {
         // If file_sizes provided, check size > 0.
         // If size is 0, we skip duplicating this file.
-        if let Some(sizes) = &file_sizes {
-            if sizes[i] == 0 {
-                continue;
-            }
+        if let Some(sizes) = &file_sizes
+            && sizes[i] == 0
+        {
+            continue;
         }
 
         let original_seed = specs[i].seed;
-        
+
         let threshold = (prob * (u64::MAX as f64)) as u64;
         if rng.next_u64() < threshold {
             // Generate duplicates
             let max_extra = max_dups - 1;
-             let copies = if max_extra > 1 {
+            let copies = if max_extra > 1 {
                 (rng.next_u64() % (max_extra as u64)) + 1
             } else {
                 1
             };
-            
+
             for _ in 0..copies {
                 let spec = FileSpec {
                     seed: original_seed,
@@ -209,21 +214,17 @@ fn add_duplicates_to_specs_and_buffer(
                         Some(permissions[(original_seed % permissions.len() as u64) as usize])
                     },
                 };
-                
+
                 // Hybrid approach: 50% chance to scatter, 50% chance to keep local
-                // Unless we have 0 bytes logic (handled by caller passing None sizes for 0 byte), 
-                // but checking size here just in case sizes is Some
-                
-                let size_val = if let Some(sizes) = &file_sizes {
-                     Some(sizes[i])
-                } else {
-                     None
-                };
+                // Unless we have 0 bytes logic (handled by caller passing None sizes for 0
+                // byte), but checking size here just in case sizes is Some
+
+                let size_val = file_sizes.as_ref().map(|sizes| sizes[i]);
 
                 // Determine if we scatter or keep local
                 // If scatter, push to pending buffer
                 // If local, push to specs (and sizes)
-                if rng.next_u32() % 2 == 0 {
+                if rng.next_u32().is_multiple_of(2) {
                     // Scatter
                     pending_buffer.push(PendingDuplicate {
                         spec,
@@ -268,29 +269,30 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
         let num_dirs = dirs_to_gen(num_files, gen_dirs, num_dirs_distr, random);
 
         let mut file_specs = generate_primary_specs(num_files, random, permissions);
-        
-        // Use a separate RNG for duplicates to avoid affecting the primary structure sequence
+
+        // Use a separate RNG for duplicates to avoid affecting the primary structure
+        // sequence
         let mut dup_rng = random.clone();
-        
+
         if bytes.is_some() {
             add_duplicates_to_specs_and_buffer(
-                &mut file_specs, 
+                &mut file_specs,
                 None, // Dynamic generator doesn't track per-file sizes here
                 pending_duplicates,
-                duplicate_percentage, 
-                max_duplicates_per_file, 
+                duplicate_percentage,
+                max_duplicates_per_file,
                 &mut dup_rng,
                 permissions,
             );
-            
+
             // Inject pending (LIFO for efficiency)
             let limit = (num_files / 2).max(1) as usize;
             let drain_count = min(pending_duplicates.len(), limit);
             for _ in 0..drain_count {
-                 // LIFO pop
-                 if let Some(dup) = pending_duplicates.pop() {
-                     file_specs.push(dup.spec);
-                 }
+                // LIFO pop
+                if let Some(dup) = pending_duplicates.pop() {
+                    file_specs.push(dup.spec);
+                }
             }
         }
 
@@ -325,46 +327,45 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
                 false,
             )
         } else {
-            queue(build_params!(file_specs, NoGeneratedFileContents, audit_trail), false)
+            queue(
+                build_params!(file_specs, NoGeneratedFileContents, audit_trail),
+                false,
+            )
         }
     }
 
-    fn maybe_queue_final_gen(
-        &mut self,
-        file: FastPathBuf,
-        _: &mut Vec<Vec<u64>>,
-    ) -> QueueResult {
+    fn maybe_queue_final_gen(&mut self, file: FastPathBuf, _: &mut Vec<Vec<u64>>) -> QueueResult {
         let Self {
-             ref pending_duplicates,
-             audit_trail: _,
-             ..
+            ref pending_duplicates,
+            audit_trail: _,
+            ..
         } = *self;
-        
+
         if pending_duplicates.is_empty() {
-             return Err(QueueErrors::NothingToDo(file));
+            return Err(QueueErrors::NothingToDo(file));
         }
-        
+
         // Flush all pending
         let mut file_specs = Vec::with_capacity(pending_duplicates.len());
-        // We need to drain from self.pending_duplicates, but we only have ref to self? 
+        // We need to drain from self.pending_duplicates, but we only have ref to self?
         // No, signature is &mut self.
         // But we destructured `ref pending_duplicates`.
         // Let's re-destructure or use self directly.
-        
+
         let Self {
-             ref mut pending_duplicates,
-             ref mut random,
-             ref bytes,
-             ref audit_trail,
-             ..
+            ref mut pending_duplicates,
+            ref mut random,
+            ref bytes,
+            ref audit_trail,
+            ..
         } = *self;
-        
+
         while let Some(dup) = pending_duplicates.pop() {
             file_specs.push(dup.spec);
         }
-        
+
         if file_specs.is_empty() {
-             return Err(QueueErrors::NothingToDo(file));
+            return Err(QueueErrors::NothingToDo(file));
         }
 
         macro_rules! build_params {
@@ -398,7 +399,10 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for DynamicGenerator<R> 
                 true, // done
             )
         } else {
-            queue(build_params!(file_specs, NoGeneratedFileContents, audit_trail), true)
+            queue(
+                build_params!(file_specs, NoGeneratedFileContents, audit_trail),
+                true,
+            )
         }
     }
 }
@@ -413,7 +417,8 @@ pub struct StaticGenerator<R> {
     pub done: bool,
     pub root_num_files_hack: Option<u64>,
 
-    // We keep DynamicGenerator's distributions for directory generation and probabilistic file sizes
+    // We keep DynamicGenerator's distributions for directory generation and probabilistic file
+    // sizes
     pub num_dirs_distr: Normal<f64>,
     pub bytes: Option<GeneratorBytes>,
     pub pending_duplicates: Vec<PendingDuplicate>,
@@ -544,7 +549,7 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
 
                 // 2. Generate NEW duplicates (if any primary files)
                 if num_files > 0 && *bytes > 0 {
-                     add_duplicates_to_specs_and_buffer(
+                    add_duplicates_to_specs_and_buffer(
                         &mut file_specs,
                         Some(&mut byte_counts),
                         pending_duplicates,
@@ -562,32 +567,36 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                     (num_files / 2).max(1) as usize
                 };
                 let drain_count = min(pending_duplicates.len(), limit);
-                
+
                 for _ in 0..drain_count {
                     if let Some(dup) = pending_duplicates.pop() {
                         file_specs.push(dup.spec);
                         // For bytes_exact, dup must have a size.
-                        // If it doesn't (maybe generated when bytes_exact was temporarily off? Impossible in this logic), 
-                        // we should probably give it 0 or log error. But here it should have size.
+                        // If it doesn't (maybe generated when bytes_exact was temporarily off?
+                        // Impossible in this logic), we should probably
+                        // give it 0 or log error. But here it should have size.
                         if let Some(s) = dup.size {
-                             byte_counts.push(s);
+                            byte_counts.push(s);
                         } else {
-                             byte_counts.push(0); // Should not happen if logic is consistent
+                            byte_counts.push(0); // Should not happen if logic is consistent
                         }
                     }
                 }
-                
+
                 // 4. Queue PreDefined
-                // If bytes_exact is 0, we treat as NoGeneratedFileContents? 
+                // If bytes_exact is 0, we treat as NoGeneratedFileContents?
                 // Original logic: if *bytes > 0 { ... } else { NoGenerated ... }
-                // But now we might have duplicates even if *bytes == 0 (remaining global bytes), if they were buffered?
-                // Actually, if *bytes == 0, we stop generating content for primary files?
-                // If *bytes > 0 is false, we technically shouldn't generate more bytes.
-                // But duplicates *have* their size pre-calculated. They don't consume *new* from `bytes`.
-                // So if we have duplicates in buffer, we should output them.
-                
-                if !byte_counts.is_empty() || (num_files > 0 && *bytes > 0) { // Condition to use PreDefined
-                     queue(
+                // But now we might have duplicates even if *bytes == 0 (remaining global
+                // bytes), if they were buffered? Actually, if *bytes == 0, we
+                // stop generating content for primary files? If *bytes > 0 is
+                // false, we technically shouldn't generate more bytes.
+                // But duplicates *have* their size pre-calculated. They don't consume *new*
+                // from `bytes`. So if we have duplicates in buffer, we should
+                // output them.
+
+                if !byte_counts.is_empty() || (num_files > 0 && *bytes > 0) {
+                    // Condition to use PreDefined
+                    queue(
                         build_params!(
                             file_specs,
                             PreDefinedGeneratedFileContents {
@@ -600,15 +609,17 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                         done,
                     )
                 } else {
-                     // Recycled byte_counts since unused
-                     byte_counts.clear();
-                     byte_counts_pool.push(byte_counts);
-                     queue(build_params!(file_specs, NoGeneratedFileContents, audit_trail), done)
+                    // Recycled byte_counts since unused
+                    byte_counts.clear();
+                    byte_counts_pool.push(byte_counts);
+                    queue(
+                        build_params!(file_specs, NoGeneratedFileContents, audit_trail),
+                        done,
+                    )
                 }
-
             } else {
                 // OnTheFly Mode (No bytes_exact tracking)
-                
+
                 // 2. Generate NEW duplicates
                 if num_files > 0 {
                     add_duplicates_to_specs_and_buffer(
@@ -621,7 +632,7 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                         permissions,
                     );
                 }
-                
+
                 // 3. Inject PENDING duplicates
                 let limit = if done {
                     pending_duplicates.len()
@@ -630,11 +641,11 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
                 };
                 let drain_count = min(pending_duplicates.len(), limit);
                 for _ in 0..drain_count {
-                     if let Some(dup) = pending_duplicates.pop() {
-                         file_specs.push(dup.spec);
-                     }
+                    if let Some(dup) = pending_duplicates.pop() {
+                        file_specs.push(dup.spec);
+                    }
                 }
-                
+
                 queue(
                     build_params!(
                         file_specs,
@@ -650,7 +661,10 @@ impl<R: RngCore + Clone + Send + 'static> StaticGenerator<R> {
             }
         } else {
             // No bytes configured (0-byte files inferred), so no duplicates logic needed
-            queue(build_params!(file_specs, NoGeneratedFileContents, audit_trail), done)
+            queue(
+                build_params!(file_specs, NoGeneratedFileContents, audit_trail),
+                done,
+            )
         }
     }
 }
@@ -715,9 +729,9 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for StaticGenerator<R> {
             return Err(QueueErrors::NothingToDo(file));
         }
         self.done = true;
-        
-        // We set done = true, so calling queue_gen_internal below will trigger the flush logic
-        // because we passed `done` (which is now true) to it?
+
+        // We set done = true, so calling queue_gen_internal below will trigger the
+        // flush logic because we passed `done` (which is now true) to it?
         // Wait, `queue_gen_internal` reads `done` from `self.done`.
         // We modified `self.done` above.
         // So yes, it will see true.
@@ -744,10 +758,7 @@ impl<R: RngCore + Clone + Send + 'static> TaskGenerator for StaticGenerator<R> {
     }
 
     fn uses_byte_counts_pool(&self) -> bool {
-        let Self {
-            bytes_exact,
-            ..
-        } = *self;
+        let Self { bytes_exact, .. } = *self;
 
         matches!(bytes_exact, Some(b) if b > 0)
     }

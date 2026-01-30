@@ -309,7 +309,8 @@ fn print_configuration_info(
         output,
         "{file_count_type} {} {files_maybe_plural} will be generated in approximately {} \
          {directories_maybe_plural} distributed across a tree of maximum depth {} where each \
-         directory contains approximately {} other {dpd_directories_maybe_plural}.{bytes_info}{duplicate_info}",
+         directory contains approximately {} other \
+         {dpd_directories_maybe_plural}.{bytes_info}{duplicate_info}",
         files.separate_with_commas(),
         total_dirs.separate_with_commas(),
         max_depth.separate_with_commas(),
@@ -350,7 +351,10 @@ fn print_configuration_info(
             String::new()
         },
         duplicate_info = if duplicate_percentage > 0.0 {
-            format!(" Approximately {:.0}% of additional duplicate files will be generated.", duplicate_percentage)
+            format!(
+                " Approximately {duplicate_percentage:.0}% of additional duplicate files will be \
+                 generated."
+            )
         } else {
             String::new()
         },
@@ -448,7 +452,7 @@ async fn run_generator_async(
         seed,
         duplicate_percentage,
         max_duplicates_per_file,
-        audit_output:_,
+        audit_output: _,
         permissions,
         human_info: _,
     }: Configuration,

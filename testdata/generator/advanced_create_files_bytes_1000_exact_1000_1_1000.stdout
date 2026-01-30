@@ -1,5 +1,5 @@
 About 1,000 files will be generated in approximately 1 directory distributed across a tree of maximum depth 1 where each directory contains approximately 1 other directory. Each file will contain approximately 1 byte of random data totaling exactly 1000 bytes.
-Created 1,005 files (1.0 kB) across 1 directory.
+Created 1,008 files (1.0 kB) across 1 directory.
 
 /0
 /0.dir
@@ -965,7 +965,6 @@ Created 1,005 files (1.0 kB) across 1 directory.
 /963
 /964
 /965
-/966
 /97
 /98
 /99
@@ -1001,11 +1000,15 @@ Created 1,005 files (1.0 kB) across 1 directory.
 /0.dir/35
 /0.dir/36
 /0.dir/37
+/0.dir/38
+/0.dir/39
 /0.dir/4
+/0.dir/40
+/0.dir/41
 /0.dir/5
 /0.dir/6
 /0.dir/7
 /0.dir/8
 /0.dir/9
 
-0xf313bc5e1f3b50af
+0x6f2e620f9b345b1a

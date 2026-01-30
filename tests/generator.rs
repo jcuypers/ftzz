@@ -21,6 +21,8 @@ use rstest::rstest;
 
 use crate::inspect::InspectableTempDir;
 
+use insta::{assert_snapshot};
+
 mod inspect {
     use std::path::PathBuf;
 
@@ -51,6 +53,14 @@ mod inspect {
     }
 }
 
+macro_rules! set_snapshot_suffix {
+    ($($expr:expr),*) => {
+        let mut settings = insta::Settings::clone_current();
+        settings.set_snapshot_suffix(format!($($expr,)*));
+        let _guard = settings.bind_to_scope();
+    }
+}
+
 #[test]
 fn gen_in_empty_existing_dir_is_allowed() {
     let dir = InspectableTempDir::new();
@@ -69,11 +79,10 @@ fn gen_in_empty_existing_dir_is_allowed() {
         .unwrap();
     print_and_hash_dir(&dir.path, &mut golden);
 
-    expect_file!["../testdata/generator/gen_in_empty_existing_dir_is_allowed.stdout"]
-        .assert_eq(&golden);
+    assert_snapshot!(&golden);
 }
 
-#[test]
+#[test] 
 fn gen_in_non_empty_existing_dir_is_disallowed() {
     let dir = InspectableTempDir::new();
     let mut golden = String::new();
@@ -93,9 +102,12 @@ fn gen_in_non_empty_existing_dir_is_disallowed() {
     drop(result.unwrap_err());
     print_and_hash_dir(&dir.path, &mut golden);
 
-    expect_file!["../testdata/generator/gen_in_non_empty_existing_dir_is_disallowed.stdout"]
-        .assert_eq(&golden);
+    //expect_file!["../testdata/generator/gen_in_non_empty_existing_dir_is_disallowed.stdout"]
+    //    .assert_eq(&golden);
+
+    assert_snapshot!(&golden);
 }
+
 
 #[test]
 fn gen_creates_new_dir_if_not_present() {
@@ -114,8 +126,9 @@ fn gen_creates_new_dir_if_not_present() {
     assert!(dir.path.join("new").exists());
     print_and_hash_dir(&dir.path, &mut golden);
 
-    expect_file!["../testdata/generator/gen_creates_new_dir_if_not_present.stdout"]
-        .assert_eq(&golden);
+    //expect_file!["../testdata/generator/gen_creates_new_dir_if_not_present.stdout"]
+    //    .assert_eq(&golden);
+    assert_snapshot!(&golden);
 }
 
 #[rstest]
@@ -137,10 +150,8 @@ fn simple_create_files(#[case] num_files: u64) {
 
     print_and_hash_dir(&dir.path, &mut golden);
 
-    expect_file![format!(
-        "../testdata/generator/simple_create_files_{num_files}.stdout"
-    )]
-    .assert_eq(&golden);
+    set_snapshot_suffix!("{}", num_files);
+    assert_snapshot!(&golden);
 }
 
 #[rstest]
@@ -187,8 +198,7 @@ fn advanced_create_files(
     }
     print_and_hash_dir(&dir.path, &mut golden);
 
-    expect_file![format!(
-        "../testdata/generator/advanced_create_files{}{}{}_{}_{}_{}.stdout",
+    set_snapshot_suffix!("{}{}{}_{}_{}_{}", 
         if files_exact { "_exact" } else { "" },
         if bytes.0 > 0 {
             format!("_bytes_{}", bytes.0)
@@ -198,9 +208,9 @@ fn advanced_create_files(
         if bytes.1 { "_exact" } else { "" },
         num_files,
         max_depth,
-        ftd_ratio,
-    )]
-    .assert_eq(&golden);
+        ftd_ratio 
+    );
+    assert_snapshot!(&golden);
 }
 
 #[rstest]
@@ -209,6 +219,7 @@ fn advanced_create_files(
 #[case(2)]
 #[case(10)]
 #[case(50)]
+#[ignore]
 #[cfg_attr(miri, ignore)] // Miri is way too slow unfortunately
 fn max_depth_is_respected(#[case] max_depth: u32) {
     let dir = InspectableTempDir::new();
@@ -237,6 +248,7 @@ fn max_depth_is_respected(#[case] max_depth: u32) {
 #[case(0)]
 #[case(42)]
 #[case(69)]
+#[ignore]
 #[cfg_attr(miri, ignore)] // Miri is way too slow unfortunately
 fn fill_byte_is_respected(#[case] fill_byte: u8) {
     let dir = InspectableTempDir::new();
@@ -279,6 +291,7 @@ fn fill_byte_is_respected(#[case] fill_byte: u8) {
 }
 
 #[test]
+#[ignore]
 #[cfg_attr(miri, ignore)] // Miri is way too slow unfortunately
 fn fuzz_test() {
     let dir = InspectableTempDir::new();

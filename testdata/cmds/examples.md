@@ -3,7 +3,7 @@
 ```console
 $ ftzz -n 1K -b 100 --files-exact --bytes-exact all-exact-explicit
 Exactly 1,000 files will be generated in approximately 1,000 directories distributed across a tree of maximum depth 5 where each directory contains approximately 4 other directories. Each file will contain approximately 0 bytes of random data totaling exactly 100 bytes.
-Created 1,000 files (100 B) across 983 directories.
+Created 1,000 files (100 B) across 1,364 directories.
 
 ```
 
@@ -21,7 +21,7 @@ Info output:
 ```console
 $ ftzz -vv -n 1K verbose
 About 1,000 files will be generated in approximately 1,000 directories distributed across a tree of maximum depth 5 where each directory contains approximately 4 other directories.
-[INFO  ftzz::generator] Starting config: Configuration { root_dir: "verbose", files: 1000, bytes: 0, files_exact: false, bytes_exact: false, fill_byte: None, dirs_per_dir: 3.9810717055349727, bytes_per_file: 0.0, max_depth: 5, seed: 2268264718836998093, audit_output: None, human_info: HumanInfo { dirs_per_dir: 4, total_dirs: 1000, bytes_per_files: 0 } }
-Created 578 files across 1,033 directories.
+[INFO  ftzz::generator] Starting config: Configuration { root_dir: "verbose", files: 1000, bytes: 0, files_exact: false, bytes_exact: false, fill_byte: None, dirs_per_dir: 3.9810717055349727, bytes_per_file: 0.0, max_depth: 5, seed: 2268264718836998093, duplicate_percentage: 0.0, max_duplicates_per_file: 1, audit_output: None, permissions: [], human_info: HumanInfo { dirs_per_dir: 4, total_dirs: 1000, bytes_per_files: 0 } }
+Created 788 files across 561 directories.
 
 ```

@@ -1,4 +1,5 @@
-use std::{fs, process::Command, os::unix::fs::PermissionsExt};
+use std::{fs, os::unix::fs::PermissionsExt, process::Command};
+
 use tempfile::TempDir;
 
 #[test]
@@ -33,7 +34,12 @@ seed = 1234
         if file_path.exists() {
             let metadata = fs::metadata(&file_path).unwrap();
             let mode = metadata.permissions().mode() & 0o777;
-            assert!(mode == 0o600 || mode == 0o755, "File {} has unexpected mode {:o}", i, mode);
+            assert!(
+                mode == 0o600 || mode == 0o755,
+                "File {} has unexpected mode {:o}",
+                i,
+                mode
+            );
         }
     }
 
@@ -54,7 +60,11 @@ seed = 1234
         if path1.exists() && path2.exists() {
             let mode1 = fs::metadata(&path1).unwrap().permissions().mode() & 0o777;
             let mode2 = fs::metadata(&path2).unwrap().permissions().mode() & 0o777;
-            assert_eq!(mode1, mode2, "File {} has inconsistent mode between runs", i);
+            assert_eq!(
+                mode1, mode2,
+                "File {} has inconsistent mode between runs",
+                i
+            );
         }
     }
 }
@@ -80,7 +90,12 @@ fn test_cli_permissions() {
         if file_path.exists() {
             let metadata = fs::metadata(&file_path).unwrap();
             let mode = metadata.permissions().mode() & 0o777;
-            assert!(mode == 0o644 || mode == 0o700, "File {} has unexpected mode {:o}", i, mode);
+            assert!(
+                mode == 0o644 || mode == 0o700,
+                "File {} has unexpected mode {:o}",
+                i,
+                mode
+            );
         }
     }
 }

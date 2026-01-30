@@ -25,27 +25,27 @@ $ cargo +nightly install ftzz
 Generate a reproducibly random tree in the current directory with *approximately* 1 million files:
 
 ```console
-$ ftzz ./simple -n 1M
+$ ftzz /dev/shm/simple -n 1M
 About 1,000,000 files will be generated in approximately 1,000 directories distributed across a tree of maximum depth 5 where each directory contains approximately 4 other directories.
-Created 1,003,229 files across 1,259 directories.
+Created 999,750 files across 1,250 directories.
 
 ```
 
 Generate *exactly* 1 million files:
-
+ 
 ```console
-$ ftzz ./exact -en 1M
+$ ftzz /dev/shm/exact -en 1M
 Exactly 1,000,000 files will be generated in approximately 1,000 directories distributed across a tree of maximum depth 5 where each directory contains approximately 4 other directories.
-Created 1,000,000 files across 1,259 directories.
+Created 1,000,000 files across 1,250 directories.
 
 ```
 
 Generate ~10_000 files with ~1 MB of random data spread across them:
 
 ```console
-$ ftzz ./with_data -n 10K -b 1M
+$ ftzz /dev/shm/with_data -n 10K -b 1M
 About 10,000 files will be generated in approximately 1,000 directories distributed across a tree of maximum depth 5 where each directory contains approximately 4 other directories. Each file will contain approximately 100 bytes of random data.
-Created 9,312 files (924.6 kB) across 1,570 directories.
+Created 9,330 files ([..] kB) across 1,685 directories.
 
 ```
 
@@ -54,13 +54,16 @@ structure given the same inputs. To generate variations on a structure with the 
 change the starting seed:
 
 ```console
-$ ftzz ./unseeded -n 100
+$ ftzz /dev/shm/unseeded -n 100
 About 100 files will be generated in approximately 100 directories distributed across a tree of maximum depth 5 where each directory contains approximately 3 other directories.
-Created 45 files across 198 directories.
+Created 65 files across 152 directories.
 
-$ ftzz ./seeded -n 100 --seed 42 # Or $RANDOM
+```
+
+```console
+$ ftzz /dev/shm/seeded -n 100 42 # Or $RANDOM
 About 100 files will be generated in approximately 100 directories distributed across a tree of maximum depth 5 where each directory contains approximately 3 other directories.
-Created 83 files across 110 directories.
+Created 63 files across 138 directories.
 
 ```
 
@@ -81,13 +84,16 @@ named `n` and directories are named `n.dir` for a given natural number `n`.
 By default, generated files are empty, but random data can be used as the file contents with the
 `total-bytes` option.
 
-Usage: ftzz[EXE] [OPTIONS] --files <NUM_FILES> <ROOT_DIR>
+Usage: ftzz [OPTIONS] <ROOT_DIR> [SEED]
 
 Arguments:
   <ROOT_DIR>
           The directory in which to generate files
           
           The directory will be created if it does not exist.
+
+  [SEED]
+          Change the PRNG's starting seed [default: 0]
 
 Options:
   -n, --files <NUM_FILES>
@@ -104,8 +110,6 @@ Options:
           
           Note: this value is probabilistically respected, meaning any amount of data may be
           generated so long as we attempt to get close to N.
-          
-          [default: 0]
 
       --fill-byte <FILL_BYTE>
           Specify a specific fill byte to be used instead of deterministically random data
@@ -119,9 +123,7 @@ Options:
           Whether or not to generate exactly N files and bytes
 
   -d, --max-depth <MAX_DEPTH>
-          The maximum directory tree depth
-          
-          [default: 5]
+          The maximum directory tree depth [default: 5]
 
   -r, --ftd-ratio <FILE_TO_DIR_RATIO>
           The number of files to generate per directory (default: files / 1000)
@@ -129,15 +131,20 @@ Options:
           Note: this value is probabilistically respected, meaning not all directories will have N
           files).
 
-      --seed <SEED>
-          Change the PRNG's starting seed
-          
-          For example, you can use bash's `$RANDOM` function.
-          
-          [default: 0]
-
   -a, --audit-output <AUDIT_OUTPUT>
           Write an audit log of all generated files to this path
+
+      --duplicate-percentage <PERCENTAGE>
+          Percentage of additional duplicate files to generate (relative to the number of files)
+
+      --max-duplicates-per-file <MAX>
+          Maximum number of duplicates per file
+
+      --permissions <OCTAL>
+          List of file permission octals to deterministically select from
+
+      --config <CONFIG_FILE>
+          Path to a TOML configuration file
 
   -h, --help
           Print help (use `-h` for a summary)

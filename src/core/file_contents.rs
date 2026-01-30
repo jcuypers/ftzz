@@ -1,13 +1,20 @@
-use std::{fs, fs::File, io, io::Read};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+use std::{fs, fs::File, io, io::Read};
 
 use cfg_if::cfg_if;
 use rand::{RngCore, SeedableRng, TryRngCore};
 use rand_distr::Normal;
 use rand_xoshiro::Xoshiro256PlusPlus;
+#[cfg(target_os = "linux")]
+use rustix::fs::{FileType, Mode, mknodat};
+#[cfg(all(unix, not(target_os = "linux")))]
+use rustix::fs::{Mode, OFlags, openat};
 
-use crate::{core::{FileSpec, sample_truncated}, utils::FastPathBuf};
+use crate::{
+    core::{FileSpec, sample_truncated},
+    utils::FastPathBuf,
+};
 
 pub trait FileContentsGenerator {
     type State;
@@ -55,8 +62,6 @@ impl FileContentsGenerator for NoGeneratedFileContents {
                     Ok((0, None))
                 })
             } else if #[cfg(target_os = "linux")] {
-                use rustix::fs::{mknodat, FileType, Mode};
-
                 let cstr = file.to_cstr_mut();
                 mknodat(
                     rustix::fs::CWD,
@@ -68,8 +73,6 @@ impl FileContentsGenerator for NoGeneratedFileContents {
                 .map_err(io::Error::from)
                 .map(|()| (0, None))
             } else {
-                use rustix::fs::{openat, OFlags, Mode};
-
                 let cstr = file.to_cstr_mut();
                 openat(
                     rustix::fs::CWD,
@@ -124,19 +127,22 @@ impl FileContentsGenerator for OnTheFlyGeneratedFileContents {
 
         // Use the seed from the spec for content generation if applicable.
         // But `random` here is the state of the generator.
-        // Wait, if we want deterministic content per file based on seed, we should NOT use `random` (which is shared state).
-        // OR we should re-seed `random` or use a new RNG based on `spec.seed`.
-        
-        // Since `queue_gen` will pass unique seeds for each file, we can use `spec.seed`.
-        
+        // Wait, if we want deterministic content per file based on seed, we should NOT
+        // use `random` (which is shared state). OR we should re-seed `random`
+        // or use a new RNG based on `spec.seed`.
+
+        // Since `queue_gen` will pass unique seeds for each file, we can use
+        // `spec.seed`.
+
         let mut file_rnd = Xoshiro256PlusPlus::seed_from_u64(spec.seed);
         // We use local RNG for this file.
         // But `create_file` signature takes `random: &mut Self::State`.
         // We should ignore `random` for content generation if we use `spec.seed`.
-        // However, `random` might be used for other things? No, it's `OnTheFlyGeneratedFileContents`.
-        // The `random` passed in is the generator's state. 
-        // If we want deterministic per file, we should use `spec.seed`.
-        
+        // However, `random` might be used for other things? No, it's
+        // `OnTheFlyGeneratedFileContents`. The `random` passed in is the
+        // generator's state. If we want deterministic per file, we should use
+        // `spec.seed`.
+
         let num_bytes = sample_truncated(num_bytes_distr, &mut file_rnd);
         if num_bytes > 0 || retryable {
             File::create(&*file).and_then(|f| {
@@ -199,7 +205,7 @@ impl FileContentsGenerator for PreDefinedGeneratedFileContents {
         // But for content generation (if random bytes), we should use `spec.seed`?
         // PreDefinedGeneratedFileContents usually has a shared RNG state.
         // If we want duplicate files to be identical, we must use `spec.seed`.
-        
+
         let mut file_rnd = Xoshiro256PlusPlus::seed_from_u64(spec.seed);
 
         let num_bytes = byte_counts[file_num];
