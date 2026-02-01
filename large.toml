@@ -2,7 +2,7 @@
 # All fields are optional
 
 # The number of files to generate
-files = 100000
+files = 1000000
 
 # Write an audit log of all generated files to this path
 audit_output = "audit.db"
@@ -11,7 +11,7 @@ audit_output = "audit.db"
 files_exact = true
 
 # Total amount of random data in bytes
-total_bytes = 1000000000 
+total_bytes = 100000000000 
 
 # Specific fill byte (0-255)
 # fill_byte = 0
@@ -20,10 +20,11 @@ total_bytes = 1000000000
 bytes_exact = false
 
 # Whether to generate exactly N files and bytes
-exact = true
+exact = false
+
 
 # Maximum directory tree depth
-max_depth = 1
+max_depth = 5
 
 # Number of files per directory
 #ftd_ratio = 1000
@@ -36,4 +37,3 @@ duplicate_percentage = 0
 #max_duplicates_per_file = 0
 
 permissions = ["400","404","440","444","600","600","640","644","664","666","700","770","777"]
-

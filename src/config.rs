@@ -8,7 +8,7 @@ use error_stack::{Result, ResultExt};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Default, Clone)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "snake_case")]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     pub files: Option<NonZeroU64>,
